@@ -15,8 +15,6 @@ MEMORY
 
 SECTIONS
 {
-
-
    .const      > ext_ddr
    .bss        > ext_ddr
    .far        > ext_ddr
@@ -29,4 +27,6 @@ SECTIONS
    .text       > ext_ddr
    .sysmem     > ext_ddr
    .switch     > ext_ddr
+
+   .intvecs    > ext_ddr
 }

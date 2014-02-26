@@ -1,3 +1,4 @@
+#include "core/core.h"
 #include "syscalls/syscalls.h"
 
 static int initHardware( void );
@@ -72,9 +73,15 @@ initOs( void )
 	// TODO: setup scheduling structures
 	// TODO: setup vmem structures
 
-	initCore();
+	if ( initCore() )
+	{
+		return 1;
+	}
 
-	initSysCalls();
+	if ( initSysCalls() )
+	{
+		return 1;
+	}
 
 	return 0;
 }

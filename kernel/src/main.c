@@ -1,6 +1,9 @@
 #include "core/core.h"
 #include "syscalls/syscalls.h"
 
+/**
+ * Prototypes
+ */
 static int initHardware( void );
 static int initOs( void );
 static int initDrivers( void );

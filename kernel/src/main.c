@@ -4,16 +4,16 @@
 /**
  * Prototypes
  */
-static int initHardware( void );
-static int initOs( void );
-static int initDrivers( void );
-static int initSystem( void );
+static int32_t initHardware( void );
+static int32_t initOs( void );
+static int32_t initDrivers( void );
+static int32_t initSystem( void );
 
 /**
  * Entry-Point of Kernel.
  * NOTE: the entry-point of each module in the kernel is placed on top of the corresponding module-file
  */
-int
+int32_t
 main( void )
 {
 	if ( initHardware() )
@@ -51,7 +51,7 @@ main( void )
  * - power management functionality
  * - interrupts
  */
-int
+int32_t
 initHardware( void )
 {
 	return 0;
@@ -67,7 +67,7 @@ initHardware( void )
  * - ... ?
  *
  */
-int
+int32_t
 initOs( void )
 {
 	// TODO: setup global kernel data-structure
@@ -95,7 +95,7 @@ initOs( void )
  * - RS232 (serial) driver
  * - DMX driver
  */
-int
+int32_t
 initDrivers( void )
 {
 	// TODO: start keyboard-driver server
@@ -110,7 +110,7 @@ initDrivers( void )
  * - minimal bash
  * - ...
  */
-int
+int32_t
 initSystem( void )
 {
 	// TODO: start minimal bash

@@ -8,6 +8,8 @@
 #ifndef CORE_H_
 #define CORE_H_
 
+#include <inttypes.h>
+
 // defines the context data-structure of the kernel
 typedef struct
 {
@@ -18,6 +20,6 @@ typedef struct
 // global kernel-context instance
 KernelContext kernelContext;
 
-int initCore( void );
+int32_t initCore( void );
 
 #endif /* CORE_H_ */

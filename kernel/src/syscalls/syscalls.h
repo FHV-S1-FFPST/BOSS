@@ -8,6 +8,8 @@
 #ifndef SYSCALLS_H_
 #define SYSCALLS_H_
 
-int initSysCalls( void );
+#include <types.h>
+
+int32_t initSysCalls( void );
 
 #endif /* SYSCALLS_H_ */

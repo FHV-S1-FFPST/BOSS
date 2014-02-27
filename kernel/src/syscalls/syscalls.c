@@ -8,17 +8,22 @@
 #include "syscalls.h"
 
 #pragma INTERRUPT ( SWI_Handler, SWI );
+#pragma SWI_ALIAS( putC, 8 );
 
-#pragma SWI_ALIAS( put, 48 );
+int32_t putC( byte c );
 
-int put ( char *key, int value );
-
-int
+int32_t
 initSysCalls( void )
 {
-	char c = 'c';
+	volatile uint32_t cpsr = _enable_interrupts();
+	_enable_FIQ();
+	_enable_IRQ();
 
-	if ( put( &c, 42 )  )
+	cpsr = _get_CPSR();
+
+	byte c = 'c';
+
+	if ( putC( c )  )
 	{
 		return 1;
 	}
@@ -26,11 +31,11 @@ initSysCalls( void )
 	return 0;
 }
 
-interrupt void SWI_Handler()
+__interrupt
+void SWI_Handler( uint32_t id )
 {
-	int i = 0;
+	int32_t i = id;
 	i = 42 * 2;
-	int x = i * i;
+	int32_t x = i * i;
 
 }
-

@@ -7,7 +7,7 @@
 
 #include "core.h"
 
-int
+int32_t
 initCore( void )
 {
 	// TODO init kernel-structure

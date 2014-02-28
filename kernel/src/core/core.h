@@ -14,7 +14,7 @@
 typedef struct
 {
 	// TODO: kernel-data goes here
-	char version;
+	uint8_t version;
 } KernelContext;
 
 // global kernel-context instance

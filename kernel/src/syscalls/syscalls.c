@@ -7,7 +7,6 @@
 
 #include "syscalls.h"
 
-#pragma INTERRUPT ( SWI_Handler, SWI );
 #pragma SWI_ALIAS( putC, 8 );
 
 int32_t putC( byte c );
@@ -15,8 +14,6 @@ int32_t putC( byte c );
 int32_t
 initSysCalls( void )
 {
-	volatile uint32_t cpsr = _enable_interrupts();
-
 	byte c = 'c';
 
 	if ( putC( c )  )
@@ -27,12 +24,3 @@ initSysCalls( void )
 	return 0;
 }
 
-interrupt
-void SWI_Handler()
-{
-	int32_t i = 0;
-	i = 42 * 2;
-	int32_t x = i * i;
-
-	// TODO: implement
-}

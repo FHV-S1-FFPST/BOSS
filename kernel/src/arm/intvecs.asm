@@ -7,7 +7,7 @@
 	.global SWI_Handler
 
 	.sect ".intvecs"
-	B _c_int00 		; reset interrupt
+	;B _c_int00 		; reset interrupt
 	.word 0 		; undefined instruction interrupt
 	B SWI_Handler 	; software interrupt
 	.word 0 		; abort (prefetch) interrupt

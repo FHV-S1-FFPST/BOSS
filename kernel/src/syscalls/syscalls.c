@@ -16,10 +16,6 @@ int32_t
 initSysCalls( void )
 {
 	volatile uint32_t cpsr = _enable_interrupts();
-	_enable_FIQ();
-	_enable_IRQ();
-
-	cpsr = _get_CPSR();
 
 	byte c = 'c';
 
@@ -31,11 +27,12 @@ initSysCalls( void )
 	return 0;
 }
 
-__interrupt
-void SWI_Handler( uint32_t id )
+interrupt
+void SWI_Handler()
 {
-	int32_t i = id;
+	int32_t i = 0;
 	i = 42 * 2;
 	int32_t x = i * i;
 
+	// TODO: implement
 }

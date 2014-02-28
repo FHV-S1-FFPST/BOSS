@@ -9,7 +9,6 @@
 
 MEMORY
 {
-	root_ram:	ORIGIN = 0x0			LENGTH = 0x40200000
 	int_ram:	ORIGIN = 0x40200000		LENGTH = 0x0000FFFF
 	ext_ddr:	ORIGIN = 0x82000000		LENGTH = 0x00010000
 }
@@ -28,6 +27,6 @@ SECTIONS
    .text       > ext_ddr
    .sysmem     > ext_ddr
 
-   //.intvecs    > 0x0
-
-}
+	// map interrupt-vectors to this address. found in OMAP35x.pdf at page 3438
+   .intvecs    > 0x4020FFC8
+ }

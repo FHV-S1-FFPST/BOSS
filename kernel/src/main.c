@@ -1,5 +1,4 @@
 #include "core/core.h"
-#include "syscalls/syscalls.h"
 
 /**
  * Prototypes
@@ -9,7 +8,8 @@ static int32_t initOs( void );
 static int32_t initDrivers( void );
 static int32_t initSystem( void );
 
-void  xdc_runtime_Startup_reset__I( void )
+// TODO: can we get rid of it? it comes from the boot.asm
+void xdc_runtime_Startup_reset__I( void )
 {
 
 }
@@ -39,7 +39,7 @@ main( void )
 		return 3;
 	}
 
-	// NOTE: at this point we can send through RS232
+	// NOTE: at this point we should be able to send through RS232
 
 	if ( initSystem() )
 	{
@@ -75,18 +75,11 @@ initHardware( void )
 int32_t
 initOs( void )
 {
-	// TODO: setup global kernel data-structure
-
 	// TODO: setup task structures
 	// TODO: setup scheduling structures
 	// TODO: setup vmem structures
 
 	if ( initCore() )
-	{
-		return 1;
-	}
-
-	if ( initSysCalls() )
 	{
 		return 1;
 	}

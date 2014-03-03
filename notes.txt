@@ -1,0 +1,62 @@
+What we need in the beginning
+Kernel
+	-> IPC
+	-> address space manipulation
+	-> Tasks & Task-Scheduling
+	-> Sys-Calls
+System-Servers
+	-> Pager
+	-> Memory-Management
+Drivers
+	-> Keyboard
+	-> screen-output?
+Minimal Bash or DMX application
+
+
+distributed DMX-applications
+	-> possible through messaging
+	-> peer-to-peer topology (each dmx can controll all the others)
+	
+IPC implementation
+	-> synchronous and unbuffered
+	-> ports = a message-queue in a process/task which 
+	-> no copy of data, instead remap: create shared memory-pool between processes
+	
+interrupts
+	-> implement as polling or waiting for messages
+
+cache misses
+	-> what if it happens during kernel-code?
+	-> what if it happens during user-space app?
+
+threading
+	
+I/O
+- is memory-mapped IO possible : can we map device ports into other address spaces? 
+	
+Memory-Management outside of Kernel
+- reason: memory-management & paging use is strongly policy driven => move out of the kernel
+- hierarchical memory management through servers & pagers. 
+- Alternative: inside the kernel (malloc/free) with a pager-server which gets called at a page fault to bring in pages. maybe this is easier to implement, to use and to debug instead of the hierarchical system
+
+Mapping of memory through IPC
+- map
+- grant
+- flush
+	
+Rules
+1. keep the kernel minimal
+2. no policies in the kernel, leave them to the user-app. an implication of this is the moving of creating, managing and scheduling of threads in the user-space (a lib can be written to encapsulate the basic work for it)
+3. only basic mechanisms in the kernel (IPC, Address Spaces, Task & Task Scheduling)
+	
+What goes into the u-Kernel
+1. IPC
+2. address spaces
+3. scheduling & Tasks
+
+Sys-Calls
+1. IPC - sends and receives a message to/from a server. synchronious and unbuffered
+2. task_new - creates a new task
+3. thread_switch - can yield execution of the CPU to another or a specified thread (policies in user-app)
+4. thread_schedule - tasks acting as schedulers for their threads and can define priority, timeslice, length and EXTERNAL PREEMTER (?) 
+5. lthread_ex_regs - sets IP and SP for a thread which becomes thus runnable

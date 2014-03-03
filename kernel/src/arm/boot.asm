@@ -320,6 +320,17 @@ _c_int00: .asmfunc
 	BIC     sp, sp, #0x07  ; Clear upper 3 bits for 64-bit alignment.
 	.endif
 
+	;*---------------------------------
+	;* JONATHAN: set Vector base address to be 0x40200000
+	; http://e2e.ti.com/support/dsp/omap_applications_processors/f/447/t/29274.aspx
+	;*---------------------------------
+	MOV r5, #0x40
+    MOV r0, r5, lsl#24   		; we left shit r5 by 24 bits, then save that value into r0
+    MOV r5, #0x20        		; r5 = 0x20
+    MOV r5, r5, lsl#16   		; we left shift r5 by 15bits and save the value into r5 itself
+    ORR r0, r0, r5             	; logical OR r0 and r5 and save the result in r0.
+    MCR p15, #0, r0, c12, c0, #0
+
 	;*-----------------------------------------------------
 	;* SAVE CURRENT STACK POINTER FOR SDP ANALYSIS
 	;*-----------------------------------------------------

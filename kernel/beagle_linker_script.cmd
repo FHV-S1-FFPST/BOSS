@@ -27,6 +27,9 @@ SECTIONS
    .text       > ext_ddr
    .sysmem     > ext_ddr
 
-	// map interrupt-vectors to this address. found in OMAP35x.pdf at page 3438
-   .intvecs    > 0x4020FFC8
+	// map interrupt-vectors to 0x40200000 instead of 0x4020FFC8 (OMAP35x.pdf at page 3438) because would not
+	// fit to memory (overshoot length). so in boot.asm the c12 register is set to 0x40200000
+   .intvecs    > 0x40200000
  }
+
+

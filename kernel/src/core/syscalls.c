@@ -5,29 +5,28 @@
  *      Author: Thaler
  */
 
-#include "syscalls.h"
-
+#include "../public/boss.h"
 
 int32_t
-send( uint32_t id, byte* data, uint8_t dataSize )
+send( uint32_t id, uint8_t* data, uint8_t dataSize )
 {
 	// TODO: implement
 
-	return 0;
+	return 31;
 }
 
 int32_t
-receive( uint32_t id, byte* data, uint8_t dataSize )
+receive( uint32_t id, uint8_t* data, uint8_t dataSize )
 {
 	// TODO: implement
 
-	return 0;
+	return 32;
 }
 
 int32_t
-sendrcv( uint32_t id, byte* data, uint8_t dataSize )
+sendrcv( uint32_t id, uint8_t* data, uint8_t dataSize )
 {
 	// TODO: implement
 
-	return 0;
+	return 33;
 }

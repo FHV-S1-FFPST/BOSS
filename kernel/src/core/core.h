@@ -8,7 +8,7 @@
 #ifndef CORE_H_
 #define CORE_H_
 
-#include <types.h>
+#include <inttypes.h>
 
 // defines the context data-structure of the kernel
 typedef struct

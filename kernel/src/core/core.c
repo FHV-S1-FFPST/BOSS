@@ -7,15 +7,12 @@
 
 #include "core.h"
 
-#include "syscalls.h"
+#include "../public/boss.h"
 
-#pragma SWI_ALIAS( send, 8 );
-#pragma SWI_ALIAS( receive, 9 );
-#pragma SWI_ALIAS( sendrcv, 10 );
+#include <stdarg.h>
 
 #pragma INTERRUPT ( resetHandler, RESET );
 #pragma INTERRUPT ( undefInstrHandler, UDEF );
-#pragma INTERRUPT ( swiHandler, SWI );
 #pragma INTERRUPT ( prefetchAbortHandler, PABT );
 #pragma INTERRUPT ( dataAbortHandler, DABT );
 #pragma INTERRUPT ( irqHandler, IRQ );
@@ -26,10 +23,6 @@ initCore( void )
 {
 	// TODO: setup global kernel data-structure
 
-	uint8_t data[] = "jonathan";
-	uint8_t dataSize = sizeof( data );
-
-	uint32_t ret = send( 42, data, dataSize );
 
 	return 0;
 }
@@ -46,23 +39,38 @@ void undefInstrHandler()
 	// TODO: implement
 }
 
-interrupt
-void swiHandler()
+// NOTE: not marked with interrupt, applied different technique to handle SWI
+uint32_t
+swiHandler( uint32_t swiId, ... )
 {
-	// TODO: implement
+	uint32_t ret = 0;
 
-	//asm( " STMFD sp!,{r0-r12,lr}" ); 	// Store registers.
-
-	asm( " LDR r0,[lr,#-4]" ); 			// Calculate address of SWI instruction and load it into r0.
-	asm( " BIC r0,r0,#0xff000000" ); 	// Mask off top 8 bits of
-
-	register int swiId;// asm( " r0" );
-
-	if ( 8 == swiId )
+	if ( SYSCALL_SEND_ID == swiId || SYSCALL_RECEIVE_ID == swiId || SYSCALL_SENDRCV_ID == swiId )
 	{
+		va_list ap;
+		va_start( ap, swiId );
 
+		uint32_t sendId = va_arg( ap, uint32_t );
+		uint8_t* data = va_arg( ap, uint8_t* );
+		uint8_t dataSize = va_arg( ap, uint8_t );
+
+		if ( SYSCALL_SEND_ID == swiId )
+		{
+			ret = send( sendId, data, dataSize );
+		}
+		else if ( SYSCALL_RECEIVE_ID == swiId )
+		{
+			ret = receive( sendId, data, dataSize );
+		}
+		else if ( SYSCALL_SENDRCV_ID == swiId )
+		{
+			ret = sendrcv( sendId, data, dataSize );
+		}
+
+		va_end( ap );
 	}
-	// TODO: restore registers r0-r3 and r12
+
+	return ret;
 }
 
 interrupt

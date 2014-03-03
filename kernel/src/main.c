@@ -1,5 +1,10 @@
 #include "core/core.h"
 
+////////////// for testing purposes only: making SWI-calls ////////////
+#undef KERNEL
+#include "public/boss.h"
+///////////////////////////////////////////////////////////////////////
+
 /**
  * Prototypes
  */
@@ -12,6 +17,14 @@ static int32_t initSystem( void );
 void xdc_runtime_Startup_reset__I( void )
 {
 
+}
+
+void test( void )
+{
+	uint8_t data[] = "jonathan";
+	uint8_t dataSize = sizeof( data );
+
+	uint32_t ret = send( 42, data, dataSize );
 }
 
 /**
@@ -46,6 +59,8 @@ main( void )
 		// initializing OS failed, exit OS
 		return 4;
 	}
+
+	test();
 
 	// the mother of all endless-loops...
 	while ( 1 ) {}

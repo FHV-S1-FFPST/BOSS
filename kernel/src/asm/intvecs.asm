@@ -5,7 +5,7 @@
 
 	.global resetHandler
 	.global undefInstrHandler
-	.global swiHandler
+	.global _swi_handler_asm
 	.global prefetchAbortHandler
 	.global dataAbortHandler
 	.global irqHandler
@@ -14,7 +14,7 @@
 	.sect ".intvecs"
 	B resetHandler			; reset interrupt
 	B undefInstrHandler 	; undefined instruction interrupt
-	B swiHandler 			; software interrupt
+	B _swi_handler_asm 		; software interrupt
 	B prefetchAbortHandler	; abort (prefetch) interrupt
 	B dataAbortHandler		; abort (data) interrupt
 	.word 0 				; reserved

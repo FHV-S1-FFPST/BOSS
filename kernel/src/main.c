@@ -2,7 +2,7 @@
 
 ////////////// for testing purposes only: making SWI-calls ////////////
 #undef KERNEL
-#include "public/boss.h"
+#include <boss.h>
 ///////////////////////////////////////////////////////////////////////
 
 /**
@@ -14,10 +14,7 @@ static int32_t initDrivers( void );
 static int32_t initSystem( void );
 
 // TODO: can we get rid of it? it comes from the boot.asm
-void xdc_runtime_Startup_reset__I( void )
-{
-
-}
+void xdc_runtime_Startup_reset__I( void ) {}
 
 void test( void )
 {
@@ -52,13 +49,13 @@ main( void )
 		return 3;
 	}
 
-	// NOTE: at this point we should be able to send through RS232
-
 	if ( initSystem() )
 	{
 		// initializing OS failed, exit OS
 		return 4;
 	}
+
+	// NOTE: at this point we should be able to send through RS232
 
 	test();
 

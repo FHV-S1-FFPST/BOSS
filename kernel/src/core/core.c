@@ -5,10 +5,15 @@
  *      Author: Thaler
  */
 
+// first include: header-file of the .c-file
 #include "core.h"
 
-#include "../public/boss.h"
+// second includes: local includes
 
+// third includes: project-includes
+#include <boss.h>
+
+// fourth includes: clib and system-includes
 #include <stdarg.h>
 
 #pragma INTERRUPT ( resetHandler, RESET );
@@ -22,7 +27,6 @@ int32_t
 initCore( void )
 {
 	// TODO: setup global kernel data-structure
-
 
 	return 0;
 }
@@ -40,12 +44,12 @@ void undefInstrHandler()
 }
 
 // NOTE: not marked with interrupt, applied different technique to handle SWI
-uint32_t
+int32_t
 swiHandler( uint32_t swiId, ... )
 {
-	uint32_t ret = 0;
+	int32_t ret = 0;
 
-	if ( SYSCALL_SEND_ID == swiId || SYSCALL_RECEIVE_ID == swiId || SYSCALL_SENDRCV_ID == swiId )
+	if ( SYSC_SEND == swiId || SYSC_RECEIVE == swiId || SYSC_SENDRCV == swiId )
 	{
 		va_list ap;
 		va_start( ap, swiId );
@@ -54,20 +58,32 @@ swiHandler( uint32_t swiId, ... )
 		uint8_t* data = va_arg( ap, uint8_t* );
 		uint8_t dataSize = va_arg( ap, uint8_t );
 
-		if ( SYSCALL_SEND_ID == swiId )
+		if ( SYSC_SEND == swiId )
 		{
 			ret = send( sendId, data, dataSize );
 		}
-		else if ( SYSCALL_RECEIVE_ID == swiId )
+		else if ( SYSC_RECEIVE == swiId )
 		{
 			ret = receive( sendId, data, dataSize );
 		}
-		else if ( SYSCALL_SENDRCV_ID == swiId )
+		else if ( SYSC_SENDRCV == swiId )
 		{
 			ret = sendrcv( sendId, data, dataSize );
 		}
 
 		va_end( ap );
+	}
+	else if ( SYSC_CREATEPROC == swiId )
+	{
+		ret = createProcess();
+	}
+	else if ( SYSC_FORK == swiId )
+	{
+		ret = fork();
+	}
+	else
+	{
+		ret = -1;
 	}
 
 	return ret;

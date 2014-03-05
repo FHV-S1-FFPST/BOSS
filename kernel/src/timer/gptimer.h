@@ -15,6 +15,10 @@
 #define GPTIMER_TCLR 0x024 //
 #define GPTIMER_TCRR 0x028 // timer counter
 #define GPTIMER_TLDR 0x02C // timer load value
+#define GPTIMER_TWER 0x020 //
+#define GPTIMER_TISR 0x018
+
+#define INTCPS_MIR_CLEAR1 0x482000A8
 
 #define GPTIMER_MATCH 1
 #define GPTIMER_OVF (1<<1)

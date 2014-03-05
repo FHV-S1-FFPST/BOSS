@@ -10,6 +10,10 @@
 
 #include <boss.h>
 
+#define reg32r(b, r) (*(volatile uint32_t *)((b)+(r)))
+#define reg32w(b, r, v) (*((volatile uint32_t *)((b)+(r))) = (v))
 
+#define INTCPS_MIR_CLEAR1 0x482000A8
+#define INTCPS_SIR_IRQ 0x48200040
 
 #endif /* COMMON_H_ */

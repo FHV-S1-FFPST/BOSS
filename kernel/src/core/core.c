@@ -16,6 +16,8 @@
 // fourth includes: clib and system-includes
 #include <stdarg.h>
 
+#include "../common/common.h"
+
 #pragma INTERRUPT ( resetHandler, RESET );
 #pragma INTERRUPT ( undefInstrHandler, UDEF );
 #pragma INTERRUPT ( prefetchAbortHandler, PABT );
@@ -104,7 +106,9 @@ void dataAbortHandler()
 interrupt
 void irqHandler()
 {
-	// TODO: implement
+	_disable_interrupts();
+	uint32_t irq_nr = reg32r(INTCPS_SIR_IRQ, 0);
+	_enable_interrupts();
 }
 
 interrupt

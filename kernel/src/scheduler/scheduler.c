@@ -7,8 +7,10 @@
 
 
 #include "scheduler.h"
+#include "../common/common.h"
+#include "../timer/gptimer.h"
 
-void
+uint32_t
 initScheduler() {
 	reg32w(INTCPS_MIR_CLEAR1, 0, (1 << 6));
 	reg32w(GPTIMER2_BASE, GPTIMER_TCRR, 0x00);
@@ -18,6 +20,8 @@ initScheduler() {
 	reg32w(GPTIMER2_BASE, GPTIMER_TWER, 0x01);
 	reg32w(GPTIMER2_BASE, GPTIMER_TISR, 0x03);
 	reg32w(GPTIMER2_BASE, GPTIMER_TCLR, (1 << 6) | 0x03);
+
+	return 0;
 }
 
 void

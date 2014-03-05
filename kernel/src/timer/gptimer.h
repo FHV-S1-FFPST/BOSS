@@ -18,8 +18,6 @@
 #define GPTIMER_TWER 0x020 //
 #define GPTIMER_TISR 0x018
 
-#define INTCPS_MIR_CLEAR1 0x482000A8
-
 #define GPTIMER_MATCH 1
 #define GPTIMER_OVF (1<<1)
 #define GPTIMER_CAPT (1<<2)

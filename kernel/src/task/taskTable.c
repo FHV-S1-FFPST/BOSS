@@ -11,7 +11,7 @@ static Task taskTable[MAX_TASKS];
 static uint32_t nextFreePID = 0;
 
 Task* getTask(uint32_t pid) {
-	if(pid < 0 || pid > MAX_TASKS) {
+	if(pid > MAX_TASKS) {
 		return (void *)0;
 	}
 	return &taskTable[pid];

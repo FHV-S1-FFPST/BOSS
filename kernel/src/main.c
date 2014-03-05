@@ -1,4 +1,5 @@
 #include "core/core.h"
+#include "scheduler/scheduler.h"
 
 #include "tasksimpl/task1.h"
 #include "tasksimpl/task2.h"
@@ -83,6 +84,11 @@ initOs( void )
 	// TODO: setup vmem structures
 
 	if ( initCore() )
+	{
+		return 1;
+	}
+
+	if( initScheduler() )
 	{
 		return 1;
 	}

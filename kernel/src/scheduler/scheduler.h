@@ -10,10 +10,7 @@
 
 #include <boss.h>
 
-#define reg32r(b, r) (*(volatile uint32_t *)((b)+(r)))
-#define reg32w(b, r, v) (*((volatile uint32_t *)((b)+(r))) = (v))
-
-void initScheduler();
+uint32_t initScheduler();
 void schedule();
 
 #endif /* SCHEDULER_H_ */

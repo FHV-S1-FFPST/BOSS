@@ -12,10 +12,6 @@ static int32_t initOs( void );
 static int32_t initDrivers( void );
 static int32_t initSystem( void );
 
-// TODO: can we get rid of it? it comes from the boot.asm
-void xdc_runtime_Startup_reset__I( void ) {}
-
-
 /**
  * Entry-Point of Kernel.
  * NOTE: the entry-point of each module in the kernel is placed on top of the corresponding module-file

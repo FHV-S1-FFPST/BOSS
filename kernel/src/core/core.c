@@ -18,11 +18,9 @@
 
 #include "../common/common.h"
 
-#pragma INTERRUPT ( resetHandler, RESET );
 #pragma INTERRUPT ( undefInstrHandler, UDEF );
 #pragma INTERRUPT ( prefetchAbortHandler, PABT );
 #pragma INTERRUPT ( dataAbortHandler, DABT );
-#pragma INTERRUPT ( irqHandler, IRQ );
 #pragma INTERRUPT ( fiqHandler, FIQ );
 
 int32_t
@@ -31,12 +29,6 @@ initCore( void )
 	// TODO: setup global kernel data-structure
 
 	return 0;
-}
-
-interrupt
-void resetHandler()
-{
-	// TODO: implement
 }
 
 interrupt
@@ -103,12 +95,14 @@ void dataAbortHandler()
 	// TODO: implement
 }
 
-interrupt
-void irqHandler()
+void
+irqHandler()
 {
-	_disable_interrupts();
-	uint32_t irq_nr = reg32r(INTCPS_SIR_IRQ, 0);
-	_enable_interrupts();
+	volatile uint32_t* irq_nr_addr = INTCPS_SIR_IRQ;
+	uint32_t irq_nr = *irq_nr_addr;
+
+	//uint32_t irq_nr = reg32r( INTCPS_SIR_IRQ, 0 );
+	//irq_nr &= 127;
 }
 
 interrupt

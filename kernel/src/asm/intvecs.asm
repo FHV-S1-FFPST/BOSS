@@ -3,16 +3,16 @@
 ; *
 ; *********************************************************************
 
-	.global resetHandler
+	.global _reset_handler_asm
 	.global undefInstrHandler
 	.global _swi_handler_asm
 	.global prefetchAbortHandler
 	.global dataAbortHandler
-	.global irqHandler
+	.global irqHandler ;_irq_handler_asm
 	.global fiqHandler
 
 	.sect ".intvecs"
-	B resetHandler			; reset interrupt
+	B _reset_handler_asm	; reset interrupt
 	B undefInstrHandler 	; undefined instruction interrupt
 	B _swi_handler_asm 		; software interrupt
 	B prefetchAbortHandler	; abort (prefetch) interrupt

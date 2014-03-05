@@ -65,7 +65,7 @@
         .asg	_args_main,   ARGS_MAIN_RTN
         .asg	exit,         EXIT_RTN
         .asg    main_func_sp, MAIN_FUNC_SP
-	.asg	xdc_runtime_Startup_reset__I,	RESET_FUNC
+	.asg	_reset_handler_asm,	RESET_FUNC
    .elseif __TI_ARM9ABI_ASSEMBLER | .TMS470_32BIS
         .asg	__args_main,   ARGS_MAIN_RTN
         .asg	_exit,         EXIT_RTN
@@ -305,6 +305,10 @@ _c_int00: .asmfunc
         BIC     r0, r0, #0x1F  ; CLEAR MODES
         ORR     r0, r0, #0x1F  ; SET SYSTEM MODE
         MSR     cpsr_cf, r0
+
+		; JONATHAN: need to set the stack-pointer for IRQ - mode
+		;http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0489c/Cihibbbh.html
+		MSR 	CPSR_c, r0
 
         ;*------------------------------------------------------
         ;* INITIALIZE THE USER/SYSTEM MODE STACK                      

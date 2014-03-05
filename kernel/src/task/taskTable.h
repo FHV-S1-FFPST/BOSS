@@ -8,7 +8,11 @@
 #ifndef TASKTABLE_H_
 #define TASKTABLE_H_
 
+#include "task.h"
 
+#define MAX_TASKS 32
 
+Task* getTask(uint32_t pid);
+int32_t addTask(Task task);
 
 #endif /* TASKTABLE_H_ */

@@ -8,28 +8,37 @@
 
 #include "scheduler.h"
 
+void
+initScheduler() {
+	reg32w(INTCPS_MIR_CLEAR1, 0, (1 << 6));
+	reg32w(GPTIMER2_BASE, GPTIMER_TCRR, 0x00);
+	reg32w(GPTIMER2_BASE, GPTIMER_TIER, GPTIMER_MATCH);
+	reg32w(GPTIMER2_BASE, GPTIMER_TMAR, (1 << 28));
+	reg32w(GPTIMER2_BASE, GPTIMER_TLDR, 0x00);
+	reg32w(GPTIMER2_BASE, GPTIMER_TWER, 0x01);
+	reg32w(GPTIMER2_BASE, GPTIMER_TISR, 0x03);
+	reg32w(GPTIMER2_BASE, GPTIMER_TCLR, (1 << 6) | 0x03);
+}
+
+void
+schedule() {
+	//TODO: asdf
+}
+
 int32_t
 createTask( task_func entryPoint )
 {
-	// TODO: create new task-entry in structure
-	// TODO: PC = entryPoint
-
 	return entryPoint( 0 );
 }
 
 int32_t
 fork()
 {
-	// TODO: clone the task-structure of the current running process
-	// TODO: child needs to return 0 (r0 = 0) and parent > 0 (r0 = pid)
-
 	return 0;
 }
 
 int32_t
 sleep( uint32_t millis )
 {
-	// TODO: tell scheduler to keep it not ready for the next millis
-
 	return 0;
 }

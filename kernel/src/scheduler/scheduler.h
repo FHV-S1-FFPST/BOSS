@@ -8,7 +8,6 @@
 #ifndef SCHEDULER_H_
 #define SCHEDULER_H_
 
-
-
+#include <boss.h>
 
 #endif /* SCHEDULER_H_ */

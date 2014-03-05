@@ -1,5 +1,7 @@
 #include "core/core.h"
-#include "procs/processes.h"
+
+#include "tasksimpl/task1.h"
+#include "tasksimpl/task2.h"
 
 /**
  * Prototypes
@@ -11,6 +13,7 @@ static int32_t initSystem( void );
 
 // TODO: can we get rid of it? it comes from the boot.asm
 void xdc_runtime_Startup_reset__I( void ) {}
+
 
 /**
  * Entry-Point of Kernel.
@@ -114,9 +117,8 @@ initSystem( void )
 	// TODO: start minimal bash
 
 	// Start some test-processes to test our scheduler
-	createProcess( process1 );
-	createProcess( process2 );
-	createProcess( process3 );
+	createTask( task1 );
+	createTask( task2 );
 
 	return 0;
 }

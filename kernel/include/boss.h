@@ -26,8 +26,8 @@
 #define SYSC_RECEIVE			9
 #define SYSC_SENDRCV			10
 
-// PROCESS-MANAGEMENT CALLS
-#define SYSC_CREATEPROC			11
+// TASK-MANAGEMENT CALLS
+#define SYSC_CREATETASK			11
 #define SYSC_FORK				12
 #define SYSC_SLEEP				13
 ///////////////////////////////////////////////////////////////////////////////
@@ -39,14 +39,14 @@
 	#pragma SWI_ALIAS( receive, SYSC_RECEIVE );
 	#pragma SWI_ALIAS( sendrcv, SYSC_SENDRCV );
 
-	// PROCESS-MANAGEMENT CALLS
-	#pragma SWI_ALIAS( createProcess, SYSC_CREATEPROC );
+	// TASK-MANAGEMENT CALLS
+	#pragma SWI_ALIAS( createProcess, SYSC_CREATETASK );
 	#pragma SWI_ALIAS( fork, SYSC_FORK );
 	#pragma SWI_ALIAS( sleep, SYSC_SLEEP );
 #endif
 ///////////////////////////////////////////////////////////////////////////////
 
-typedef int32_t (*proc_func) ( void* args );
+typedef int32_t (*task_func) ( void* args );
 
 // SYSTEM-CALLS ///////////////////////////////////////////////////////////////
 
@@ -68,19 +68,19 @@ int32_t receive( uint32_t channelId, uint8_t* data, uint8_t dataSize );
  */
 int32_t sendrcv( uint32_t channelId, uint8_t* data, uint8_t dataSize );
 
-// Process-management calls
+// Task-management calls
 /**
  * Starts a process from the given process-function.
  */
-int32_t createProcess( proc_func entryPoint );
+int32_t createTask( task_func entryPoint );
 
 /**
- * Forks the process. will return 0 for the child-process and > 0 for the parent-process.
+ * Forks the task. Will return 0 for the child-task and > 0 for the parent-task.
  */
 int32_t fork();
 
 /**
- * Suspends the process for at least the given milliseconds.
+ * Suspends the task for at least the given milliseconds.
  */
 int32_t sleep( uint32_t millis );
 

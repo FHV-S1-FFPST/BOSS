@@ -67,11 +67,11 @@ swiHandler( uint32_t swiId, uint32_t* regs )
 			ret = sendrcv( regs[ 0 ], data, dataSize );
 		}
 	}
-	else if ( SYSC_CREATEPROC == swiId )
+	else if ( SYSC_CREATETASK == swiId )
 	{
-		proc_func entryPoint = ( proc_func ) regs[ 0 ];
+		task_func entryPoint = ( task_func ) regs[ 0 ];
 
-		ret = createProcess( entryPoint );
+		ret = createTask( entryPoint );
 	}
 	else if ( SYSC_FORK == swiId )
 	{

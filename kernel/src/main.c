@@ -49,7 +49,7 @@ main( void )
 
 	// NOTE: at this point we should be able to send through RS232
 
-	//test();
+	_enable_IRQ();
 
 	// the mother of all endless-loops...
 	while ( 1 ) {}

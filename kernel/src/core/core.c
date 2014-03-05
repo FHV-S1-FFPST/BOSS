@@ -45,18 +45,15 @@ void undefInstrHandler()
 
 // NOTE: not marked with interrupt, applied different technique to handle SWI
 int32_t
-swiHandler( uint32_t swiId, ... )
+swiHandler( uint32_t swiId, uint32_t* regs )
 {
 	int32_t ret = 0;
 
 	if ( SYSC_SEND == swiId || SYSC_RECEIVE == swiId || SYSC_SENDRCV == swiId )
 	{
-		va_list ap;
-		va_start( ap, swiId );
-
-		uint32_t sendId = va_arg( ap, uint32_t );
-		uint8_t* data = va_arg( ap, uint8_t* );
-		uint8_t dataSize = va_arg( ap, uint8_t );
+		uint32_t sendId = regs[ 0 ];
+		uint8_t* data = ( uint8_t* ) regs[ 1 ];
+		uint8_t dataSize = ( uint8_t ) regs[ 2 ];
 
 		if ( SYSC_SEND == swiId )
 		{
@@ -70,8 +67,6 @@ swiHandler( uint32_t swiId, ... )
 		{
 			ret = sendrcv( sendId, data, dataSize );
 		}
-
-		va_end( ap );
 	}
 	else if ( SYSC_CREATEPROC == swiId )
 	{

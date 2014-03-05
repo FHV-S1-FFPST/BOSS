@@ -29,6 +29,7 @@
 // PROCESS-MANAGEMENT CALLS
 #define SYSC_CREATEPROC			11
 #define SYSC_FORK				12
+#define SYSC_SLEEP				13
 ///////////////////////////////////////////////////////////////////////////////
 
 // defined SWI-aliases for the given sys-calls for user-apps //////////////////
@@ -41,8 +42,11 @@
 	// PROCESS-MANAGEMENT CALLS
 	#pragma SWI_ALIAS( createProcess, SYSC_CREATEPROC );
 	#pragma SWI_ALIAS( fork, SYSC_FORK );
+	#pragma SWI_ALIAS( sleep, SYSC_SLEEP );
 #endif
 ///////////////////////////////////////////////////////////////////////////////
+
+typedef int32_t (*proc_func) ( void* args );
 
 // SYSTEM-CALLS ///////////////////////////////////////////////////////////////
 
@@ -64,17 +68,22 @@ int32_t receive( uint32_t channelId, uint8_t* data, uint8_t dataSize );
  */
 int32_t sendrcv( uint32_t channelId, uint8_t* data, uint8_t dataSize );
 
-
 // Process-management calls
 /**
- * TODO: specify further which process-image to start (filesystem?)
+ * Starts a process from the given process-function.
  */
-int32_t createProcess();
+int32_t createProcess( proc_func entryPoint );
 
 /**
- * forks the process. will return 0 for the child-process and > 0 for the parent-process
+ * Forks the process. will return 0 for the child-process and > 0 for the parent-process.
  */
 int32_t fork();
+
+/**
+ * Suspends the process for at least the given milliseconds.
+ */
+int32_t sleep( uint32_t millis );
+
 ///////////////////////////////////////////////////////////////////////////////
 
 #endif /* BOSS_H_ */

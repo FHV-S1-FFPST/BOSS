@@ -30,6 +30,10 @@ SECTIONS
 	// map interrupt-vectors to 0x40200000 instead of 0x4020FFC8 (OMAP35x.pdf at page 3438) because would not
 	// fit to memory (overshoot length). so in boot.asm the c12 register is set to 0x40200000
    .intvecs    > int_ram
+
+   .proc1		> 0x82000000
+   .proc2		> 0x8200010c
+   .proc3		> 0x82000204
  }
 
 

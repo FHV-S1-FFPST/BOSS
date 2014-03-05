@@ -1,9 +1,5 @@
 #include "core/core.h"
-
-////////////// for testing purposes only: making SWI-calls ////////////
-#undef KERNEL
-#include <boss.h>
-///////////////////////////////////////////////////////////////////////
+#include "procs/processes.h"
 
 /**
  * Prototypes
@@ -15,14 +11,6 @@ static int32_t initSystem( void );
 
 // TODO: can we get rid of it? it comes from the boot.asm
 void xdc_runtime_Startup_reset__I( void ) {}
-
-void test( void )
-{
-	uint8_t data[] = "jonathan";
-	uint8_t dataSize = sizeof( data );
-
-	uint32_t ret = send( 42, data, dataSize );
-}
 
 /**
  * Entry-Point of Kernel.
@@ -57,7 +45,7 @@ main( void )
 
 	// NOTE: at this point we should be able to send through RS232
 
-	test();
+	//test();
 
 	// the mother of all endless-loops...
 	while ( 1 ) {}
@@ -124,6 +112,11 @@ int32_t
 initSystem( void )
 {
 	// TODO: start minimal bash
+
+	// Start some test-processes to test our scheduler
+	createProcess( process1 );
+	createProcess( process2 );
+	createProcess( process3 );
 
 	return 0;
 }

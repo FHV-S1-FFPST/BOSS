@@ -51,30 +51,35 @@ swiHandler( uint32_t swiId, uint32_t* regs )
 
 	if ( SYSC_SEND == swiId || SYSC_RECEIVE == swiId || SYSC_SENDRCV == swiId )
 	{
-		uint32_t sendId = regs[ 0 ];
 		uint8_t* data = ( uint8_t* ) regs[ 1 ];
 		uint8_t dataSize = ( uint8_t ) regs[ 2 ];
 
 		if ( SYSC_SEND == swiId )
 		{
-			ret = send( sendId, data, dataSize );
+			ret = send( regs[ 0 ], data, dataSize );
 		}
 		else if ( SYSC_RECEIVE == swiId )
 		{
-			ret = receive( sendId, data, dataSize );
+			ret = receive( regs[ 0 ], data, dataSize );
 		}
 		else if ( SYSC_SENDRCV == swiId )
 		{
-			ret = sendrcv( sendId, data, dataSize );
+			ret = sendrcv( regs[ 0 ], data, dataSize );
 		}
 	}
 	else if ( SYSC_CREATEPROC == swiId )
 	{
-		ret = createProcess();
+		proc_func entryPoint = ( proc_func ) regs[ 0 ];
+
+		ret = createProcess( entryPoint );
 	}
 	else if ( SYSC_FORK == swiId )
 	{
 		ret = fork();
+	}
+	else if ( SYSC_SLEEP == swiId )
+	{
+		ret = sleep( regs[ 0 ] );
 	}
 	else
 	{

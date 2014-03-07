@@ -52,31 +52,15 @@
 ;*   2) _c_int00    BOOT ROUTINE
 ;*
 ;****************************************************************************
-   .if  __TI_TMS470_V7M__
-	.thumbfunc _c_int00
-   .else
 	.armfunc _c_int00
-   .endif
 
 ;****************************************************************************
 ; Accomodate different lowerd names in different ABIs
 ;****************************************************************************
-   .if   __TI_EABI_ASSEMBLER
-        .asg	_args_main,   ARGS_MAIN_RTN
-        .asg	exit,         EXIT_RTN
-        .asg    main_func_sp, MAIN_FUNC_SP
-	.asg	_reset_handler_asm,	RESET_FUNC
-   .elseif __TI_ARM9ABI_ASSEMBLER | .TMS470_32BIS
-        .asg	__args_main,   ARGS_MAIN_RTN
-        .asg	_exit,         EXIT_RTN
-        .asg    _main_func_sp, MAIN_FUNC_SP
-	.asg	_xdc_runtime_Startup_reset__I,	RESET_FUNC
-   .else
-        .asg	$_args_main,   ARGS_MAIN_RTN
-        .asg	$exit,         EXIT_RTN
-        .asg    _main_func_sp, MAIN_FUNC_SP
-	.asg	_xdc_runtime_Startup_reset__I,	RESET_FUNC
-   .endif
+    .asg	_args_main,   	ARGS_MAIN_RTN
+    .asg	exit,         	EXIT_RTN
+    .asg    main_func_sp,	MAIN_FUNC_SP
+	.asg	resetHandler,	RESET_FUNC
 
 ;****************************************************************************
 ;*  32 BIT STATE BOOT ROUTINE                                               *

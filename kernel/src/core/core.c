@@ -23,6 +23,8 @@
 #pragma INTERRUPT ( prefetchAbortHandler, PABT );
 #pragma INTERRUPT ( dataAbortHandler, DABT );
 #pragma INTERRUPT ( fiqHandler, FIQ );
+#pragma INTERRUPT ( irqHandler, IRQ );
+#pragma INTERRUPT ( resetHandler, RESET );
 
 int32_t
 initCore( void )
@@ -96,8 +98,8 @@ void dataAbortHandler()
 	// TODO: implement
 }
 
-void
-irqHandler()
+interrupt
+void irqHandler()
 {
 	uint32_t irqNr = reg32r( INTCPS_SIR_IRQ, 0 );
 
@@ -112,4 +114,10 @@ interrupt
 void fiqHandler()
 {
 	// TODO: implement
+}
+
+interrupt
+void resetHandler( void )
+{
+
 }

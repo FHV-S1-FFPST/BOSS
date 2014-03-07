@@ -12,7 +12,7 @@
 	.global fiqHandler
 
 	.sect ".intvecs"
-	B _reset_handler_asm	; reset interrupt
+	.word 0					; reset interrupt
 	B undefInstrHandler 	; undefined instruction interrupt
 	B _swi_handler_asm 		; software interrupt
 	B prefetchAbortHandler	; abort (prefetch) interrupt

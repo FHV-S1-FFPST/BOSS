@@ -7,8 +7,6 @@
 
 #include "task2.h"
 
-#pragma CODE_SECTION ( task2 , ".task2" )
-
 int32_t
 task2( void* args )
 {

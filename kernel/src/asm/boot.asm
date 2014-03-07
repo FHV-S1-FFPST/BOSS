@@ -91,8 +91,8 @@
 ;* DEFINE THE USER MODE STACK (DEFAULT SIZE IS 512)            
 ;***************************************************************
 __stack:.usect			".stack", 0, 4
-__irqstack:.usect		".irqstack", 0, 4
-__abortstack:.usect		".abortstack", 0, 4
+__irqstack:.usect		".irqstack", 512, 4
+__abortstack:.usect		".abortstack", 512, 4
 __intvecsaddr:.usect	".intvecs", 0, 4
 
 	.global	_c_int00
@@ -236,10 +236,10 @@ c_reset       	.long    RESET_FUNC
 intvecs_addr	.long	__intvecsaddr
 
 abort_stack			.long	__abortstack
-ABORT_STACK_SIZE 	.long    0x200		; TODO: move to some central constan-pool
+ABORT_STACK_SIZE 	.long    0x200		; TODO: move to some central constant-pool
 
 irq_stack		.long    __irqstack
-IRQ_STACK_SIZE 	.long    0x200		; TODO: move to some central constan-pool
+IRQ_STACK_SIZE 	.long    0x200		; TODO: move to some central constant-pool
 
 	.endif
 

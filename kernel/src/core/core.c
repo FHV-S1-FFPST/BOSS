@@ -9,6 +9,7 @@
 #include "core.h"
 
 // second includes: local includes
+#include "../scheduler/scheduler.h"
 
 // third includes: project-includes
 #include <boss.h>
@@ -98,11 +99,13 @@ void dataAbortHandler()
 void
 irqHandler()
 {
-	volatile uint32_t* irq_nr_addr = INTCPS_SIR_IRQ;
-	uint32_t irq_nr = *irq_nr_addr;
+	uint32_t irqNr = reg32r( INTCPS_SIR_IRQ, 0 );
 
-	//uint32_t irq_nr = reg32r( INTCPS_SIR_IRQ, 0 );
-	//irq_nr &= 127;
+	// TODO: make it more nice
+	if ( 38 == ( irqNr & 127 ) )
+	{
+		schedule();
+	}
 }
 
 interrupt

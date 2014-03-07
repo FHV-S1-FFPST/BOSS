@@ -8,7 +8,7 @@
 	.global _swi_handler_asm
 	.global prefetchAbortHandler
 	.global dataAbortHandler
-	.global irqHandler ;_irq_handler_asm
+	.global irqHandler
 	.global fiqHandler
 
 	.sect ".intvecs"

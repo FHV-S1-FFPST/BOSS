@@ -14,5 +14,7 @@
 
 Task* getTask(uint32_t pid);
 int32_t addTask(Task task);
+int32_t getNextFreePID();
+int32_t getNumOfTasks();
 
 #endif /* TASKTABLE_H_ */

@@ -60,7 +60,6 @@
     .asg	_args_main,   	ARGS_MAIN_RTN
     .asg	exit,         	EXIT_RTN
     .asg    main_func_sp,	MAIN_FUNC_SP
-	.asg	resetHandler,	RESET_FUNC
 
 ;****************************************************************************
 ;*  32 BIT STATE BOOT ROUTINE                                               *
@@ -174,37 +173,29 @@ _c_int00: .asmfunc
 	;*-----------------------------------------------------
 	LDR	r0, c_mf_sp
 	STR	sp, [r0]
-                
-	LDR	r0, c_reset
-	CMP	r0, #0
-	BEQ	_no_reset_
-	MOV	lr, pc
-	BX	r0
 
-_no_reset_:
+    ;*------------------------------------------------------
+    ;* Perform all the required initilizations:
+    ;*   - Process BINIT Table
+    ;*   - Perform C auto initialization
+    ;*   - Call global constructors
+    ;*------------------------------------------------------
+    BL      __TI_auto_init
 
-        ;*------------------------------------------------------
-        ;* Perform all the required initilizations:
-        ;*   - Process BINIT Table
-        ;*   - Perform C auto initialization
-        ;*   - Call global constructors 
-        ;*------------------------------------------------------
-        BL      __TI_auto_init
+    ;*------------------------------------------------------
+;* CALL APPLICATION
+    ;*------------------------------------------------------
+    BL      ARGS_MAIN_RTN
 
-        ;*------------------------------------------------------
-	;* CALL APPLICATION                                     
-        ;*------------------------------------------------------    
-        BL      ARGS_MAIN_RTN
+    ;*------------------------------------------------------
+;* IF APPLICATION DIDN'T CALL EXIT, CALL EXIT(1)
+    ;*------------------------------------------------------
+    MOV     R0, #1
+    BL      EXIT_RTN
 
-        ;*------------------------------------------------------
-	;* IF APPLICATION DIDN'T CALL EXIT, CALL EXIT(1)
-        ;*------------------------------------------------------
-        MOV     R0, #1
-        BL      EXIT_RTN
-
-        ;*------------------------------------------------------
-	;* DONE, LOOP FOREVER
-        ;*------------------------------------------------------
+    ;*------------------------------------------------------
+;* DONE, LOOP FOREVER
+    ;*------------------------------------------------------
 L1:     B	L1
 	.endasmfunc
 
@@ -212,10 +203,10 @@ L1:     B	L1
 ;* CONSTANTS USED BY THIS MODULE
 ;***************************************************************
 	.if !__TI_AVOID_EMBEDDED_CONSTANTS
+
 c_stack			.long    __stack
 c_STACK_SIZE  	.long    __STACK_SIZE
 c_mf_sp	        .long    MAIN_FUNC_SP
-c_reset       	.long    RESET_FUNC
 
 intvecs_addr	.long	__intvecsaddr
 
@@ -253,7 +244,6 @@ _stkchk_called:
 	.global ARGS_MAIN_RTN
 	.global MAIN_FUNC_SP
 	.global	EXIT_RTN
-	.global	RESET_FUNC
-        .global __TI_auto_init
+	.global __TI_auto_init
 
 	.end

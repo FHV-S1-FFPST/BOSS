@@ -36,7 +36,7 @@ initScheduler() {
 }
 
 void
-schedule() {
+schedule( uint32_t userCpsr, uint32_t* userRegs ) {
 
 	Task *runningTask = getTask(runningPID);
 

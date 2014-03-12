@@ -1,4 +1,4 @@
 BOSS
 ====
 
-Beagle Operating Systems System
+Beagle Operating Super System

@@ -14,6 +14,8 @@
 #include "../task/task.h"
 #include "../task/taskTable.h"
 
+extern void _schedule_asm(uint32_t* pc, uint32_t cpsr, uint32_t userReg);
+
 uint32_t initScheduler();
 void schedule();
 uint32_t getNextReady();
@@ -55,7 +57,9 @@ schedule( uint32_t* pc, uint32_t userCpsr, uint32_t* userRegs ) {
 		}
 
 		uint32_t nextPID = getNextReady();
+		Task nextTask = getTask(nextPID);
 
+		_schedule_asm(nextTask->pc, nextTask->cpsr, nextTask->reg);
 		// reset context from next
 
 	}

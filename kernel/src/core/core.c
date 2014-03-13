@@ -97,16 +97,9 @@ void dataAbortHandler()
 }
 
 void
-irqHandler( uint32_t irqNr, uint32_t userCpsr, uint32_t* userRegs )
+irqHandler( uint32_t irqNr, uint32_t userCpsr, uint32_t* userPC, uint32_t* userRegs )
 {
 	// TODO: make it more nice
-
-	uint32_t r0 = userRegs[ 0 ];
-	uint32_t r1 = userRegs[ 1 ];
-	uint32_t r2 = userRegs[ 2 ];
-	uint32_t r3 = userRegs[ 3 ];
-	uint32_t r4 = userRegs[ 4 ];
-
 
 	if ( 38 == ( irqNr & 127 ) )
 	{

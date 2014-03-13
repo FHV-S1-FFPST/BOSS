@@ -12,6 +12,8 @@ static int32_t initOs( void );
 static int32_t initDrivers( void );
 static int32_t initSystem( void );
 
+extern void _schedule_asm( uint32_t* regs );
+
 /**
  * Entry-Point of Kernel.
  * NOTE: the entry-point of each module in the kernel is placed on top of the corresponding module-file

@@ -21,6 +21,7 @@ _irq_handler_asm:
 	BL		irqHandler					; branch AND link to irq parent handler
 
 	; NOTE: in case of scheduling we won't arrive here
+	; TODO: stack-pointer is fucked up then, because wont be resetted!
 
 	MOV		LR, R2						; restore link-register (overridden by BL to irqHandler)
 	LDMFD	SP!, { R0 - R3 }			; restore registers and return.

@@ -31,6 +31,4 @@ typedef struct {
 	TaskState state;
 } Task;
 
-
-
 #endif /* TASK_H_ */

@@ -2,13 +2,19 @@
 
 ; assumes we are in system-mode
 ; called with arguments:
-;	r0 	->	uint32_t userCpsr
-;	r1	->	uint32_t* userPC
+;	r0 	->	uint32_t* userPC
+;	r1	->	uint32_t userCpsr
 ;	r2 	->	uint32_t* userRegs
 _schedule_asm:
-	LDMFD	R0, { R0 - R14 }^	; restore user-registers
+	; TODO: fix error: need to take banked SP
+	STMFD	SP!, { R0 - R2 }	; store arguments on stack
 
-	MSR     cpsr_cf, R0			; restore user-mode cpsr
-	;CPS		#0x1F				; switch processor back to user-mode
+	SUB		SP, SP, #8			; move SP up 8 bytes, SP points now to R2 on stack
+	LDMFD	SP, { R0 - R14 }^	; restore user-registers
 
-	BX		R1			; jump back to user-task
+	ADD		SP, SP, #4			; move SP down 4 bytes, SP points now to R1 on stack
+	MSR     cpsr_cf, SP			; restore user-mode cpsr
+	;CPS		#0x1F			; switch processor back to user-mode
+
+	ADD		SP, SP, #4			; move SP down 4 bytes, SP points now to R0 on stack, original SP restored
+	BX		SP					; jump back to user-task

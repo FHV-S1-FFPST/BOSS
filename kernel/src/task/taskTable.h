@@ -12,8 +12,8 @@
 
 #define MAX_TASKS 32
 
-Task* getTask(uint32_t pid);
-int32_t addTask(Task task);
+Task* getTask( uint32_t pid );
+int32_t addTask( Task* task );
 int32_t getNextFreePID();
 int32_t getNumOfTasks();
 

@@ -7,6 +7,7 @@
 
 
 #include <stdio.h>
+#include <string.h>
 
 #include "scheduler.h"
 #include "../common/common.h"
@@ -14,19 +15,29 @@
 #include "../task/task.h"
 #include "../task/taskTable.h"
 
-extern void _schedule_asm(uint32_t* pc, uint32_t cpsr, uint32_t* userReg);
+extern void _schedule_asm( uint32_t* pc, uint32_t cpsr, uint32_t* userReg );
 
-uint32_t initScheduler();
-void schedule();
 uint32_t getNextReady();
 int32_t createTask( task_func entryPoint );
 
 static uint32_t runningPID = 0;
 
 int32_t
-idleTask(void) {
-	while(1) {}
- }
+idleTask( void* args )
+{
+	volatile uint32_t counter = 0;
+
+	while( 1 )
+	{
+		uint32_t x1 = 42;
+		uint32_t x2 = 43;
+		uint32_t x3 = 44;
+		uint32_t x4 = 45;
+
+		volatile uint32_t z = x1 + x2 + x3 + x4;
+		counter += z;
+	}
+}
 
 uint32_t
 initScheduler() {
@@ -40,42 +51,44 @@ initScheduler() {
 	reg32w(GPTIMER2_BASE, GPTIMER_TTGR, 0x00);
 	reg32w(GPTIMER2_BASE, GPTIMER_TCLR, (1 << 6) | 0x03);
 
-	createTask(idleTask);
+	createTask( idleTask );
+
 	return 0;
 }
 
 void
-schedule( uint32_t* pc, uint32_t userCpsr, uint32_t* userRegs ) {
-
-	reg32w(GPTIMER2_BASE, GPTIMER_TCLR, reg32r(GPTIMER2_BASE, GPTIMER_TCLR) & ~0x01);
-	Task *runningTask = getTask(runningPID);
-
-	if(runningTask->state == RUNNING) {
-		if(getNumOfTasks() == 1) {
-			return;
-		}
-
-		runningTask->pc = pc;
-		runningTask->cpsr = userCpsr;
-
-		uint32_t i;
-		for(i = 0; i < 15; i++) {
-			runningTask->reg[i] = *(userRegs + i);
-		}
-
-		uint32_t nextPID = getNextReady();
-		Task* nextTask = getTask(nextPID);
-
-		_schedule_asm(nextTask->pc, nextTask->cpsr, nextTask->reg);
-		// reset context from next
-
-	} else if(runningTask->state == READY) {
-
+schedule( uint32_t* userPC, uint32_t userCpsr, uint32_t* userRegs )
+{
+	// only one task in system, it must be running
+	if(getNumOfTasks() == 1)
+	{
+		return;
 	}
 
-	reg32w(GPTIMER2_BASE, GPTIMER_TTGR, 0x00);
-	reg32w(GPTIMER2_BASE, GPTIMER_TCLR, reg32r(GPTIMER2_BASE, GPTIMER_TCLR) | 0x01);
+	//reg32w(GPTIMER2_BASE, GPTIMER_TCLR, reg32r(GPTIMER2_BASE, GPTIMER_TCLR) & ~0x01);
 
+	Task* runningTask = getTask( runningPID );
+	runningTask->pc = userPC;
+	runningTask->cpsr = userCpsr;
+	memcpy( runningTask->reg, userRegs, sizeof( runningTask->reg ) );
+
+	uint32_t nextPID = getNextReady();
+
+	scheduleTask( nextPID );
+
+	// INFO: this point will never be reached
+
+	//reg32w(GPTIMER2_BASE, GPTIMER_TTGR, 0x00);
+	//reg32w(GPTIMER2_BASE, GPTIMER_TCLR, reg32r(GPTIMER2_BASE, GPTIMER_TCLR) | 0x01);
+}
+
+void
+scheduleTask( uint32_t pid )
+{
+	Task* task = getTask( pid );
+	task->state = RUNNING;
+
+	_schedule_asm( task->pc, task->cpsr, task->reg );
 }
 
 uint32_t
@@ -102,9 +115,17 @@ createTask( task_func entryPoint )
 	Task newTask;
 	newTask.state = READY;
 	newTask.pid = getNextFreePID();
-	newTask.pc = (uint32_t*) entryPoint;
+	newTask.pc = ( uint32_t* ) entryPoint;
 
-	addTask(newTask);
+	// TODO: need a valid stack-pointer
+	// TODO: check to what we need to set the LR (newTask.reg[ 14 ]
+	void* stackPtr = ( void*) malloc( 1024 );
+	memset( stackPtr, 'a', 1024 );
+
+	newTask.reg[ 13 ] = ( uint32_t ) stackPtr;
+
+	addTask( &newTask );
+
 	return 0;
 }
 

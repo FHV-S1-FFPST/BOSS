@@ -7,7 +7,8 @@
 
 #include "taskTable.h"
 
-static Task taskTable[MAX_TASKS];
+static Task taskTable[ MAX_TASKS ];
+
 static uint32_t numTasks = 0;
 static uint32_t nextFreePID = 0;
 
@@ -19,17 +20,17 @@ Task* getTask(uint32_t pid) {
 }
 
 
-int32_t addTask(Task task) {
+int32_t addTask( Task* task ) {
 
-	if(numTasks < MAX_TASKS) {
+	if( numTasks >= MAX_TASKS ) {
 		return 1;
 	}
 
-	taskTable[task.pid] = task;
+	taskTable[ task->pid ] = *( task );
 	numTasks++;
 
 	int i;
-	int nextPID = task.pid + 1 % MAX_TASKS;
+	int nextPID = task->pid + 1 % MAX_TASKS;
 	for(i = 0; i < MAX_TASKS; i++) {
 		if(getTask(nextPID)->state == INVALID) {
 			nextFreePID = nextPID;

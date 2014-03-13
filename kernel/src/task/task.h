@@ -24,8 +24,7 @@ typedef struct {
 
 	// processor state information
 	uint32_t pc;
-	uint32_t sp;
-	uint32_t reg[16];
+	uint32_t reg[15];
 	uint32_t cpsr;
 
 	// process control information

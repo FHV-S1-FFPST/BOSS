@@ -21,7 +21,12 @@ void schedule();
 uint32_t getNextReady();
 int32_t createTask( task_func entryPoint );
 
-static uint32_t runningPID = MAX_TASKS;
+static uint32_t runningPID = 0;
+
+int32_t
+idleTask(void) {
+	while(1) {}
+ }
 
 uint32_t
 initScheduler() {
@@ -35,6 +40,7 @@ initScheduler() {
 	reg32w(GPTIMER2_BASE, GPTIMER_TTGR, 0x00);
 	reg32w(GPTIMER2_BASE, GPTIMER_TCLR, (1 << 6) | 0x03);
 
+	createTask(idleTask);
 	return 0;
 }
 
@@ -49,11 +55,12 @@ schedule( uint32_t* pc, uint32_t userCpsr, uint32_t* userRegs ) {
 			return;
 		}
 
+		runningTask->pc = pc;
+		runningTask->cpsr = userCpsr;
+
 		uint32_t i;
 		for(i = 0; i < 15; i++) {
-			runningTask->pc = pc;
 			runningTask->reg[i] = *(userRegs + i);
-			runningTask->cpsr = userCpsr;
 		}
 
 		uint32_t nextPID = getNextReady();
@@ -61,6 +68,8 @@ schedule( uint32_t* pc, uint32_t userCpsr, uint32_t* userRegs ) {
 
 		_schedule_asm(nextTask->pc, nextTask->cpsr, nextTask->reg);
 		// reset context from next
+
+	} else if(runningTask->state == READY) {
 
 	}
 
@@ -93,10 +102,10 @@ createTask( task_func entryPoint )
 	Task newTask;
 	newTask.state = READY;
 	newTask.pid = getNextFreePID();
-	newTask.pc = (uint32_t*)entryPoint;
+	newTask.pc = (uint32_t*) entryPoint;
 
 	addTask(newTask);
-	return entryPoint( 0 );
+	return 0;
 }
 
 int32_t

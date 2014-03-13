@@ -11,6 +11,6 @@
 #include <boss.h>
 
 uint32_t initScheduler();
-void schedule();
+void schedule( uint32_t* pc, uint32_t userCpsr, uint32_t* userRegs );
 
 #endif /* SCHEDULER_H_ */

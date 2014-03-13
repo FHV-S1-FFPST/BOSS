@@ -107,10 +107,11 @@ _c_int00: .asmfunc
 		;*------------------------------------------------------
 		;* JONATHAN: SET TO IRQ MODE
         ;*------------------------------------------------------
-		MRS     r0, cpsr
-        BIC     r0, r0, #0x1F  ; CLEAR MODES
-        ORR     r0, r0, #0x12  ; SET IRQ MODE
-        MSR     cpsr_cf, r0
+		;MRS     r0, cpsr
+        ;BIC     r0, r0, #0x1F  ; CLEAR MODES
+        ;ORR     r0, r0, #0x12  ; SET IRQ MODE
+        ;MSR     cpsr_cf, r0
+		CPS		#0x12
 
 		;*------------------------------------------------------
         ;* JONATHAN: INITIALIZE THE IRQ MODE STACK
@@ -122,10 +123,11 @@ _c_int00: .asmfunc
 		;*------------------------------------------------------
 		;* JONATHAN: SET TO ABORT MODE
         ;*------------------------------------------------------
-		MRS     r0, cpsr
-        BIC     r0, r0, #0x1F  ; CLEAR MODES
-        ORR     r0, r0, #0x17  ; SET IRQ MODE
-        MSR     cpsr_cf, r0
+		;MRS     r0, cpsr
+        ;BIC     r0, r0, #0x1F  ; CLEAR MODES
+        ;ORR     r0, r0, #0x17  ; SET IRQ MODE
+        ;MSR     cpsr_cf, r0
+		CPS		#0x17
 
 		;*------------------------------------------------------
         ;* JONATHAN: INITIALIZE THE ABORT MODE STACK
@@ -137,10 +139,11 @@ _c_int00: .asmfunc
         ;*------------------------------------------------------
 	;* SET TO SYSTEM MODE
         ;*------------------------------------------------------
-        MRS     r0, cpsr
-        BIC     r0, r0, #0x1F  ; CLEAR MODES
-        ORR     r0, r0, #0x1F  ; SET SYSTEM MODE
-        MSR     cpsr_cf, r0
+        ;MRS     r0, cpsr
+        ;BIC     r0, r0, #0x1F  ; CLEAR MODES
+        ;ORR     r0, r0, #0x1F  ; SET SYSTEM MODE
+        ;MSR     cpsr_cf, r0
+		CPS		#0x1F
 
         ;*------------------------------------------------------
         ;* INITIALIZE THE USER/SYSTEM MODE STACK                      
@@ -160,13 +163,8 @@ _c_int00: .asmfunc
 	;* JONATHAN: set Vector base address to be 0x40200000
 	; http://e2e.ti.com/support/dsp/omap_applications_processors/f/447/t/29274.aspx
 	;*---------------------------------
-	MOV r5, #0x40
-    MOV r0, r5, lsl#24   		; we left shit r5 by 24 bits, then save that value into r0
-    MOV r5, #0x20        		; r5 = 0x20
-    MOV r5, r5, lsl#16   		; we left shift r5 by 15bits and save the value into r5 itself
-    ORR r0, r0, r5             	; logical OR r0 and r5 and save the result in r0.
-    ;LDR		r0, intvecs_addr
-    MCR p15, #0, r0, c12, c0, #0
+    LDR		r0, intvecs_addr
+    MCR 	p15, #0, r0, c12, c0, #0
 
 	;*-----------------------------------------------------
 	;* SAVE CURRENT STACK POINTER FOR SDP ANALYSIS

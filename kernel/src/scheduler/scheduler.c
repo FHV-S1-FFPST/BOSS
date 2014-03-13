@@ -26,7 +26,7 @@ initScheduler() {
 	reg32w(INTCPS_MIR_CLEAR1, 0, (1 << 6));
 	reg32w(GPTIMER2_BASE, GPTIMER_TCRR, 0x00);
 	reg32w(GPTIMER2_BASE, GPTIMER_TIER, GPTIMER_MATCH);
-	reg32w(GPTIMER2_BASE, GPTIMER_TMAR, (1 << 28));
+	reg32w(GPTIMER2_BASE, GPTIMER_TMAR, (1 << 31));
 	reg32w(GPTIMER2_BASE, GPTIMER_TLDR, 0x00);
 	reg32w(GPTIMER2_BASE, GPTIMER_TWER, 0x01);
 	reg32w(GPTIMER2_BASE, GPTIMER_TISR, 0x03);
@@ -37,7 +37,7 @@ initScheduler() {
 }
 
 void
-schedule( uint32_t userCpsr, uint32_t* userRegs ) {
+schedule( uint32_t* pc, uint32_t userCpsr, uint32_t* userRegs ) {
 
 	reg32w(GPTIMER2_BASE, GPTIMER_TCLR, reg32r(GPTIMER2_BASE, GPTIMER_TCLR) & ~0x01);
 	Task *runningTask = getTask(runningPID);
@@ -49,6 +49,7 @@ schedule( uint32_t userCpsr, uint32_t* userRegs ) {
 
 		uint32_t i;
 		for(i = 0; i < 15; i++) {
+			runningTask->pc = pc;
 			runningTask->reg[i] = *(userRegs + i);
 			runningTask->cpsr = userCpsr;
 		}
@@ -60,7 +61,7 @@ schedule( uint32_t userCpsr, uint32_t* userRegs ) {
 	}
 
 	reg32w(GPTIMER2_BASE, GPTIMER_TTGR, 0x00);
-	reg32w(GPTIMER2_BASE, GPTIMER_TIER, GPTIMER_MATCH);
+	reg32w(GPTIMER2_BASE, GPTIMER_TCLR, reg32r(GPTIMER2_BASE, GPTIMER_TCLR) | 0x01);
 
 }
 
@@ -88,7 +89,7 @@ createTask( task_func entryPoint )
 	Task newTask;
 	newTask.state = READY;
 	newTask.pid = getNextFreePID();
-	newTask.pc = (uint32_t)entryPoint;
+	newTask.pc = (uint32_t*)entryPoint;
 
 	addTask(newTask);
 	return entryPoint( 0 );

@@ -23,7 +23,7 @@ typedef struct {
 	uint32_t pid;
 
 	// processor state information
-	uint32_t pc;
+	uint32_t* pc;
 	uint32_t reg[15];
 	uint32_t cpsr;
 

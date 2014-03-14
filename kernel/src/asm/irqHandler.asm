@@ -5,7 +5,7 @@
 INTCPS_SIR_IRQ_ADDR .word 0x48200040
 
 _irq_handler_asm:
-	CPS		#0x1F						; switch to system-mode
+	CPS		#0x13						; switch to supervisor-mode
 
 	STMFD	SP, { R0 - R14 }^			; store (user) registers on stack
 	SUB		SP, SP, #60					; decrement stack-pointer: 15 * 4 bytes = 60bytes

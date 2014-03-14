@@ -27,13 +27,13 @@ idleTask( void* args )
 {
 	volatile uint32_t counter = 0;
 
+	uint32_t x1 = 42;
+	uint32_t x2 = 43;
+	uint32_t x3 = 44;
+	uint32_t x4 = 45;
+
 	while( 1 )
 	{
-		uint32_t x1 = 42;
-		uint32_t x2 = 43;
-		uint32_t x3 = 44;
-		uint32_t x4 = 45;
-
 		volatile uint32_t z = x1 + x2 + x3 + x4;
 		counter += z;
 	}
@@ -116,6 +116,7 @@ createTask( task_func entryPoint )
 	newTask.state = READY;
 	newTask.pid = getNextFreePID();
 	newTask.pc = ( uint32_t* ) entryPoint;
+	newTask.cpsr = 0x60000110; // user-mode and IRQs enabled
 
 	// TODO: need a valid stack-pointer
 	// TODO: check to what we need to set the LR (newTask.reg[ 14 ]

@@ -47,8 +47,7 @@ main( void )
 
 	// NOTE: at this point we should be able to send through RS232
 
-	// TODO: enable much later
-	//_enable_IRQ();
+	_enable_IRQ();
 
 	// schedule idle-task
 	scheduleTask( 0 );

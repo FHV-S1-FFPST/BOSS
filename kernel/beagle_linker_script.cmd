@@ -31,6 +31,8 @@ SECTIONS
 	.irqstack	> ext_ddr
 	// stack-address for abort-mode(s) 0x40200300
 	.abortstack	> ext_ddr
+	// stack-address for supervisor-mode
+	.svcstack	> ext_ddr
 	// TODO: add here further stack-addresses and initialize them in boot.asm as required
 
 

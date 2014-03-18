@@ -49,7 +49,8 @@ initScheduler() {
 	reg32w(GPTIMER2_BASE, GPTIMER_TWER, 0x01);
 	reg32w(GPTIMER2_BASE, GPTIMER_TISR, 0x03);
 	reg32w(GPTIMER2_BASE, GPTIMER_TTGR, 0x00);
-	reg32w(GPTIMER2_BASE, GPTIMER_TCLR, (1 << 6) | 0x03);
+	reg32w(GPTIMER2_BASE, GPTIMER_TCLR, 0x7F);
+
 
 	createTask( idleTask );
 

@@ -1,8 +1,10 @@
+#undef KERNEL
+
 #include "core/core.h"
 #include "scheduler/scheduler.h"
 
+#include "tasksimpl/idle.h"
 #include "tasksimpl/task1.h"
-#include "tasksimpl/task2.h"
 
 /**
  * Prototypes
@@ -11,8 +13,6 @@ static int32_t initHardware( void );
 static int32_t initOs( void );
 static int32_t initDrivers( void );
 static int32_t initSystem( void );
-
-extern void _schedule_asm( uint32_t* regs );
 
 /**
  * Entry-Point of Kernel.
@@ -44,13 +44,6 @@ main( void )
 		// initializing OS failed, exit OS
 		return 4;
 	}
-
-	// NOTE: at this point we should be able to send through RS232
-
-	_enable_IRQ();
-
-	// schedule idle-task
-	scheduleTask( 0 );
 
 	// the mother of all endless-loops...
 	while ( 1 ) {}
@@ -121,11 +114,15 @@ initDrivers( void )
 int32_t
 initSystem( void )
 {
-	// TODO: start minimal bash
+	// NOTE: at this point we should be able to send through RS232
+
+	_enable_IRQ();
+
+	// make a sys-call to create the idle-task
+	createTask( idleTask );
 
 	// Start some test-processes to test our scheduler
 	createTask( task1 );
-	createTask( task2 );
 
 	return 0;
 }

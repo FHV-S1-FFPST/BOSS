@@ -40,7 +40,7 @@
 	#pragma SWI_ALIAS( sendrcv, SYSC_SENDRCV );
 
 	// TASK-MANAGEMENT CALLS
-	#pragma SWI_ALIAS( createProcess, SYSC_CREATETASK );
+	#pragma SWI_ALIAS( createTask, SYSC_CREATETASK );
 	#pragma SWI_ALIAS( fork, SYSC_FORK );
 	#pragma SWI_ALIAS( sleep, SYSC_SLEEP );
 #endif

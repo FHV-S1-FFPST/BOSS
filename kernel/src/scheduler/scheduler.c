@@ -15,7 +15,6 @@
 #include "../task/taskTable.h"
 
 extern void _schedule_asm( uint32_t* pc, uint32_t cpsr, uint32_t* userReg );
-extern void _schedule_initial_asm( uint32_t* pc, uint32_t cpsr, uint32_t* userReg );
 
 // prototypes of this module
 uint32_t getNextReady();
@@ -34,11 +33,10 @@ initScheduler()
 	reg32w(GPTIMER2_BASE, GPTIMER_TWER, 0x01);
 	reg32w(GPTIMER2_BASE, GPTIMER_TISR, 0x03);
 	reg32w(GPTIMER2_BASE, GPTIMER_TTGR, 0x00);
-	reg32w(GPTIMER2_BASE, GPTIMER_TCLR, 0x7F);
-
+	reg32w(GPTIMER2_BASE, GPTIMER_TCLR, 0x6B);
 
 	// NOTE: need to waste some time, otherwise IRQ won't hit
-	volatile uint32_t i = 10000;
+	volatile uint32_t i = 100000;
 	while ( i > 0 )
 		--i;
 
@@ -48,8 +46,6 @@ initScheduler()
 void
 schedule( uint32_t* userPC, uint32_t userCpsr, uint32_t* userRegs )
 {
-	//reg32w(GPTIMER2_BASE, GPTIMER_TCLR, reg32r(GPTIMER2_BASE, GPTIMER_TCLR) & ~0x01);
-
 	Task* runningTask = getTask( runningPID );
 	if ( runningTask->state == RUNNING )
 	{
@@ -64,11 +60,8 @@ schedule( uint32_t* userPC, uint32_t userCpsr, uint32_t* userRegs )
 	if ( runningTask->state == READY )
 	{
 		task->state = RUNNING;
-		//_schedule_initial_asm( task->pc, task->cpsr, task->reg );
+		_schedule_asm( task->pc, task->cpsr, task->reg );
 	}
-
-	//reg32w(GPTIMER2_BASE, GPTIMER_TTGR, 0x00);
-	//reg32w(GPTIMER2_BASE, GPTIMER_TCLR, reg32r(GPTIMER2_BASE, GPTIMER_TCLR) | 0x01);
 }
 
 static uint32_t

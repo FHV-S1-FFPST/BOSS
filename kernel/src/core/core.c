@@ -10,6 +10,7 @@
 
 // second includes: local includes
 #include "../scheduler/scheduler.h"
+#include "../timer/gptimer.h"
 
 // third includes: project-includes
 #include <boss.h>
@@ -99,8 +100,10 @@ void dataAbortHandler()
 void
 irqHandler( uint32_t irqNr, uint32_t userCpsr, uint32_t* userPC, uint32_t* userRegs )
 {
-	// TODO: make it more nice
+	// clear interrupt flags
+	reg32w( GPTIMER1_BASE, GP_TIMER_IT_FLAG, 0x7 );
 
+	// TODO: make it more nice
 	if ( 38 == ( irqNr & 127 ) )
 	{
 		schedule( userPC, userCpsr, userRegs );

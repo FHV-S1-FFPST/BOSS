@@ -19,6 +19,8 @@
 #define GPTIMER_TISR 0x018
 #define GPTIMER_TTGR 0x030 // timer reloads if written
 
+#define GP_TIMER_IT_FLAG 0x018
+
 #define GPTIMER_MATCH 1
 #define GPTIMER_OVF (1<<1)
 #define GPTIMER_CAPT (1<<2)

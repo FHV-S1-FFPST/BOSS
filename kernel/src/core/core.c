@@ -97,17 +97,21 @@ void dataAbortHandler()
 	// TODO: implement
 }
 
-void
-irqHandler( uint32_t irqNr, uint32_t userCpsr, uint32_t* userPC, uint32_t* userRegs )
+uint32_t
+irqHandler( uint32_t irqNr, uint32_t* userCpsr, uint32_t* userPC, uint32_t* userRegs )
 {
+	uint32_t ret = 0;
+
 	// clear interrupt flags
-	reg32w( GPTIMER1_BASE, GP_TIMER_IT_FLAG, 0x7 );
+	reg32w( GPTIMER2_BASE, GP_TIMER_IT_FLAG, 0x7 );
 
 	// TODO: make it more nice
 	if ( 38 == ( irqNr & 127 ) )
 	{
-		schedule( userPC, userCpsr, userRegs );
+		ret = schedule( userCpsr, userPC, userRegs );
 	}
+
+	return ret;
 }
 
 interrupt

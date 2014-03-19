@@ -33,7 +33,8 @@ initScheduler()
 	reg32w(GPTIMER2_BASE, GPTIMER_TWER, 0x01);
 	reg32w(GPTIMER2_BASE, GPTIMER_TISR, 0x03);
 	reg32w(GPTIMER2_BASE, GPTIMER_TTGR, 0x00);
-	reg32w(GPTIMER2_BASE, GPTIMER_TCLR, 0x6B);
+	//reg32w(GPTIMER2_BASE, GPTIMER_TCLR, 0x6B);
+	reg32w(GPTIMER2_BASE, GPTIMER_TCLR, (1 << 6) | 0x03);
 
 	// NOTE: need to waste some time, otherwise IRQ won't hit
 	volatile uint32_t i = 100000;
@@ -43,15 +44,17 @@ initScheduler()
 	return 0;
 }
 
-void
-schedule( uint32_t* userPC, uint32_t userCpsr, uint32_t* userRegs )
+uint32_t
+schedule( uint32_t* userCpsr, uint32_t* userPc, uint32_t* userRegs )
 {
+	uint32_t ret = 0;
+
 	Task* runningTask = getTask( runningPID );
 	if ( runningTask->state == RUNNING )
 	{
 		runningTask->state = READY;
-		runningTask->pc = userPC;
-		runningTask->cpsr = userCpsr;
+		runningTask->pc = *userPc;
+		runningTask->cpsr = *userCpsr;
 		memcpy( runningTask->reg, userRegs, sizeof( runningTask->reg ) );
 	}
 
@@ -60,25 +63,35 @@ schedule( uint32_t* userPC, uint32_t userCpsr, uint32_t* userRegs )
 	if ( runningTask->state == READY )
 	{
 		task->state = RUNNING;
-		_schedule_asm( task->pc, task->cpsr, task->reg );
+		//_schedule_asm( task->pc, task->cpsr, task->reg );
+		*userPc = runningTask->pc;
+		*userCpsr = runningTask->cpsr;
+		memcpy( userRegs, runningTask->reg, sizeof( runningTask->reg ) );
+
+		// signal: a task was scheduled
+		ret = 1;
 	}
+
+	return ret;
 }
 
 static uint32_t
-getNextReady() {
+getNextReady()
+{
+	uint32_t i = 0;
+	uint32_t pid = 0;
 
-	uint32_t i;
-	uint32_t pid = runningPID % MAX_TASKS;
+	for ( i = 1; i <= MAX_TASKS; i++ )
+	{
+		pid = ( runningPID + i % MAX_TASKS );
 
-	for(i = 0; i < MAX_TASKS; i++) {
-		if(getTask(pid)->state == READY) {
+		if( READY == getTask( pid )->state )
+		{
 			return pid;
-		} else {
-			pid = (++pid) % MAX_TASKS;
 		}
 	}
 
-	return MAX_TASKS;
+	return runningPID;
 }
 
 int32_t

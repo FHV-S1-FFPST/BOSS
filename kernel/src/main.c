@@ -1,5 +1,3 @@
-#undef KERNEL
-
 #include "core/core.h"
 #include "scheduler/scheduler.h"
 

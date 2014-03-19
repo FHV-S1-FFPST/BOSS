@@ -16,6 +16,7 @@
 #define GPTIMER_TCRR 0x028 // timer counter
 #define GPTIMER_TLDR 0x02C // timer load value
 #define GPTIMER_TWER 0x020 //
+
 #define GPTIMER_TISR 0x018
 #define GPTIMER_TTGR 0x030 // timer reloads if written
 

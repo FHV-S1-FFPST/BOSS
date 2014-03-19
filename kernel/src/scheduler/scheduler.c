@@ -10,7 +10,7 @@
 
 #include "scheduler.h"
 #include "../common/common.h"
-#include "../timer/gptimer.h"
+#include "../timer/timer.h"
 #include "../task/task.h"
 #include "../task/taskTable.h"
 
@@ -23,16 +23,8 @@ static uint32_t runningPID = 0;
 uint32_t
 initScheduler()
 {
-	reg32w(INTCPS_MIR_CLEAR1, 0, (1 << 6));
-	reg32w(GPTIMER2_BASE, GPTIMER_TCRR, 0x00);
-	reg32w(GPTIMER2_BASE, GPTIMER_TIER, GPTIMER_MATCH);
-	reg32w(GPTIMER2_BASE, GPTIMER_TMAR, (1 << 31));
-	reg32w(GPTIMER2_BASE, GPTIMER_TLDR, 0x00);
-	reg32w(GPTIMER2_BASE, GPTIMER_TWER, 0x01);
-	reg32w(GPTIMER2_BASE, GPTIMER_TISR, 0x03);
-	reg32w(GPTIMER2_BASE, GPTIMER_TTGR, 0x00);
-	//reg32w(GPTIMER2_BASE, GPTIMER_TCLR, 0x6B);
-	reg32w(GPTIMER2_BASE, GPTIMER_TCLR, (1 << 6) | 0x03);
+	// want IRQ from timer every 100ms
+	timerInit( HAL_TIMER2, 100 );
 
 	// NOTE: need to waste some time, otherwise IRQ won't hit
 	volatile uint32_t i = 100000;

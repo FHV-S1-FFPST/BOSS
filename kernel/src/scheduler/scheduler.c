@@ -14,8 +14,6 @@
 #include "../task/task.h"
 #include "../task/taskTable.h"
 
-extern void _schedule_asm( uint32_t* pc, uint32_t cpsr, uint32_t* userReg );
-
 // prototypes of this module
 uint32_t getNextReady();
 int32_t createTask( task_func entryPoint );

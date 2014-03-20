@@ -91,7 +91,7 @@ createTask( task_func entryPoint )
 	Task newTask;
 	newTask.state = READY;
 	newTask.pid = getNextFreePID();
-	newTask.pc = ( uint32_t ) entryPoint;
+	newTask.pc = ( ( uint32_t ) entryPoint ) + 4; // need to increment by 4 bytes because return is done by SUBS ... #4
 	newTask.cpsr = 0x60000110; // user-mode and IRQs enabled
 
 	// TODO: need a valid stack-pointer

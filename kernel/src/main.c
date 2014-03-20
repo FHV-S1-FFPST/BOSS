@@ -114,12 +114,11 @@ initSystem( void )
 {
 	// NOTE: at this point we should be able to send through RS232
 
-	// make a sys-call to create the idle-task
 	// NOTE: DON'T remove this task, the scheduler assumes that there is at least one task in the system: the idle-task
-	createTask( idleTask );
+	createTask( task1 );
 
 	// Start some test-processes to test our scheduler
-	createTask( task1 );
+	createTask( idleTask );
 
 	// enable IRQs AFTER we created the initial tasks
 	// => when scheduling is called at least the idle-task is available

@@ -10,6 +10,7 @@
 
 #define GPTIMER1_BASE 0x48318000
 #define GPTIMER2_BASE 0x49032000
+
 #define GPTIMER_TMAR 0x038 // compare value
 #define GPTIMER_TIER 0x01C // controls interrupt events (match, overflow, capture)
 #define GPTIMER_TCLR 0x024 //

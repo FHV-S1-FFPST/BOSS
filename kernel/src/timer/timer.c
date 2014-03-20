@@ -7,6 +7,8 @@
 
 #include "timer.h"
 
+#include "../common/common.h"
+
 #define HAL_TIMER_TICKS_PER_MS 750
 
 void
@@ -35,14 +37,11 @@ void
 timerStop( uint32_t timerId )
 {
 	TCLR_GPT( timerId ) &= ~HAL_TIMER_ON_GPT;
-	volatile uint32_t* ptr = ( uint32_t* ) 0x49032024;
+	volatile uint32_t* ptr = TCLR_GPT( timerId );
 
 	*ptr &= ~HAL_TIMER_ON_GPT;
 
-	while ( TCLR_GPT( timerId ) & ~HAL_TIMER_ON_GPT )
-	{
-		TCLR_GPT( timerId ) &= ~HAL_TIMER_ON_GPT;
-	}
+	AWAIT_BITS_CLEARED( TCLR_GPT( timerId ), HAL_TIMER_ON_GPT );
 }
 
 void

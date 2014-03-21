@@ -2,24 +2,20 @@
 
 	.global irqHandler
 
-INTCPS_SIR_IRQ_ADDR .word 0x48200040
+;INTCPS_SIR_IRQ_ADDR .word 0x48200040
 
 _irq_handler_asm:
-	STMFD	SP, { R0 - R14 }^			; store (user) registers on stack
+	STMFD	SP, { R0 - R14 }^			; store user-registers on stack
 	SUB		SP, SP, #60					; decrement stack-pointer: 15 * 4 bytes = 60bytes
-	MOV		R3, SP						; pointer to user-registers in R3, content will be changed by scheduler in case of scheduling
 
 	STMFD	SP!, { LR }					; store LR in stack to either restore it after BL to allow scheduler change it (and restore it after return from BL)
-	MOV 	R2, SP						; pointer to user-pc in R2, content will be changed by scheduler in case of scheduling
 
 	MRS		R1, SPSR					; fetch user-cpsr (SPSR) value to R1
 	STMFD	SP!, { R1 }					; store SPSR in stack to allow scheduler change it
-	MOV 	R1, SP						; pointer to user-cpsr in R1, content will be changed by scheduler in case of scheduling
 
-	LDR		R0, INTCPS_SIR_IRQ_ADDR		; load address of IRQ_ADDR to R0
-	LDR 	R0, [ R0 ]					; load content of address to R0 => irq-number
+	MOV 	R0, SP						; pointer to SP in R0, to point to UserContext-struct
 
-	; irqHandler( uint32_t irqNr, uint32_t* userCpsr, uint32_t* userPC, uint32_t* userRegs )
+	; irqHandler( UserContext* ctx )
 	BL		irqHandler					; branch AND link to irq parent handler
 
 	; TODO: do a BEQ on R0:

@@ -10,7 +10,9 @@
 
 #include <boss.h>
 
+#include "../core/core.h"
+
 uint32_t initScheduler( void );
-uint32_t schedule( uint32_t* userCpsr, uint32_t* pc, uint32_t* userRegs );
+uint32_t schedule( UserContext* ctx );
 
 #endif /* SCHEDULER_H_ */

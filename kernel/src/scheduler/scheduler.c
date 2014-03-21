@@ -35,7 +35,7 @@ initScheduler()
 }
 
 uint32_t
-schedule( uint32_t* userCpsr, uint32_t* userPc, uint32_t* userRegs )
+schedule( UserContext* ctx )
 {
 	uint32_t ret = 0;
 
@@ -43,9 +43,9 @@ schedule( uint32_t* userCpsr, uint32_t* userPc, uint32_t* userRegs )
 	if ( runningTask->state == RUNNING )
 	{
 		runningTask->state = READY;
-		runningTask->pc = *userPc;
-		runningTask->cpsr = *userCpsr;
-		memcpy( runningTask->reg, userRegs, sizeof( runningTask->reg ) );
+		runningTask->pc = ctx->pc;
+		runningTask->cpsr = ctx->cpsr;
+		memcpy( runningTask->reg, ctx->regs, sizeof( runningTask->reg ) );
 	}
 
 	uint32_t nextPID = getNextReady();
@@ -53,9 +53,9 @@ schedule( uint32_t* userCpsr, uint32_t* userPc, uint32_t* userRegs )
 	if ( task->state == READY )
 	{
 		task->state = RUNNING;
-		*userPc = task->pc;
-		*userCpsr = task->cpsr;
-		memcpy( userRegs, task->reg, sizeof( task->reg ) );
+		ctx->pc = task->pc;
+		ctx->cpsr = task->cpsr;
+		memcpy( ctx->regs, task->reg, sizeof( task->reg ) );
 
 		runningPID = nextPID;
 
@@ -91,7 +91,10 @@ createTask( task_func entryPoint )
 	Task newTask;
 	newTask.state = READY;
 	newTask.pid = getNextFreePID();
-	newTask.pc = ( ( uint32_t ) entryPoint ) + 4; // need to increment by 4 bytes because return is done by SUBS ... #4
+
+	// need to increment by 4 bytes because return is done by SUBS ... #4, ONLY WHEN WE ARE IN IRQ, NOT IN SWI
+	newTask.pc = ( ( uint32_t* ) entryPoint ) + 1;
+
 	newTask.cpsr = 0x60000110; // user-mode and IRQs enabled
 
 	// TODO: need a valid stack-pointer

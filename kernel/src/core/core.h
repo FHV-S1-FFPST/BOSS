@@ -10,15 +10,12 @@
 
 #include <inttypes.h>
 
-// defines the context data-structure of the kernel
 typedef struct
 {
-	// TODO: kernel-data goes here
-	uint8_t version;
-} KernelContext;
-
-// global kernel-context instance
-KernelContext kernelContext;
+	uint32_t cpsr;
+	uint32_t* pc;
+	uint32_t regs[15];
+} UserContext;
 
 int32_t initCore( void );
 

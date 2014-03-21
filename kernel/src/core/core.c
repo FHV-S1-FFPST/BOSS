@@ -41,31 +41,33 @@ void undefInstrHandler()
 
 // NOTE: not marked with interrupt, applied different technique to handle SWI
 int32_t
-swiHandler( uint32_t swiId, uint32_t* regs )
+swiHandler( uint32_t swiId, uint32_t* swiFuncParams )
 {
+	// TODO: need process-control block struct: (userCpsr, userPc and userRegs)
+
 	int32_t ret = 0;
 
 	if ( SYSC_SEND == swiId || SYSC_RECEIVE == swiId || SYSC_SENDRCV == swiId )
 	{
-		uint8_t* data = ( uint8_t* ) regs[ 1 ];
-		uint8_t dataSize = ( uint8_t ) regs[ 2 ];
+		uint8_t* data = ( uint8_t* ) swiFuncParams[ 1 ];
+		uint8_t dataSize = ( uint8_t ) swiFuncParams[ 2 ];
 
 		if ( SYSC_SEND == swiId )
 		{
-			ret = send( regs[ 0 ], data, dataSize );
+			ret = send( swiFuncParams[ 0 ], data, dataSize );
 		}
 		else if ( SYSC_RECEIVE == swiId )
 		{
-			ret = receive( regs[ 0 ], data, dataSize );
+			ret = receive( swiFuncParams[ 0 ], data, dataSize );
 		}
 		else if ( SYSC_SENDRCV == swiId )
 		{
-			ret = sendrcv( regs[ 0 ], data, dataSize );
+			ret = sendrcv( swiFuncParams[ 0 ], data, dataSize );
 		}
 	}
 	else if ( SYSC_CREATETASK == swiId )
 	{
-		task_func entryPoint = ( task_func ) regs[ 0 ];
+		task_func entryPoint = ( task_func ) swiFuncParams[ 0 ];
 
 		ret = createTask( entryPoint );
 	}
@@ -75,7 +77,7 @@ swiHandler( uint32_t swiId, uint32_t* regs )
 	}
 	else if ( SYSC_SLEEP == swiId )
 	{
-		ret = sleep( regs[ 0 ] );
+		ret = sleep( swiFuncParams[ 0 ] );
 	}
 	else
 	{
@@ -100,16 +102,21 @@ void dataAbortHandler()
 uint32_t
 irqHandler( uint32_t irqNr, uint32_t* userCpsr, uint32_t* userPC, uint32_t* userRegs )
 {
-	uint32_t ret = 0;
+	// TODO: fetch irqNr in C-code
+	// TODO: move process-control block to a struct
 
-	// clear interrupt flags
-	reg32w( GPTIMER2_BASE, GP_TIMER_IT_FLAG, 0x7 );
+	uint32_t ret = 0;
 
 	// TODO: make it more nice
 	if ( 38 == ( irqNr & 127 ) )
 	{
 		ret = schedule( userCpsr, userPC, userRegs );
 	}
+
+	// TODO: set IRQ-interrupt flag
+
+	// clear interrupt flags
+	reg32w( GPTIMER2_BASE, GP_TIMER_IT_FLAG, 0x7 );
 
 	return ret;
 }

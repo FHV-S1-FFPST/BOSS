@@ -13,6 +13,8 @@
 #define reg32r(b, r) (*(volatile uint32_t *)((b)+(r)))
 #define reg32w(b, r, v) (*((volatile uint32_t *)((b)+(r))) = (v))
 
+#define reg32m(b, r, v) ( *( ( volatile uint32_t* ) ( b + r ) ) |= ( v ) )
+
 #define BIT_SET( val, bits ) val |= bits
 #define BIT_CLEAR( val, bits ) val &= ~bits
 #define BIT_CLEAR_ALL( val ) val = 0x0

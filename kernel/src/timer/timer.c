@@ -9,7 +9,7 @@
 
 #include "../common/common.h"
 
-#define HAL_TIMER_TICKS_PER_MS 100000
+#define HAL_TIMER_TICKS_PER_MS 1000
 
 void
 timerInit( uint32_t timerId, uint32_t intervalMs )

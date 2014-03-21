@@ -9,7 +9,6 @@
 #define TASK_H_
 
 #include <boss.h>
-#include <setjmp.h>
 
 typedef enum {
 	INVALID = 0,

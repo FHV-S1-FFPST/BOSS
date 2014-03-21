@@ -1,5 +1,4 @@
 	.global _irq_handler_asm
-
 	.global irqHandler
 
 ;INTCPS_SIR_IRQ_ADDR .word 0x48200040
@@ -30,5 +29,7 @@ _irq_handler_asm:
 	ADD		SP, SP, #60					; increment stack-pointer: 15 * 4 bytes = 60bytes
 
 	; NOTE: at this point SP should be at starting address again
+
+	; TODO: when a process-switch was performed: MOVS	PC, LR should be enough, otherwise we must return to the instruction which was canceled by IRQ thus using SUBS
 
  	SUBS	PC, LR, #4					; return from IRQ

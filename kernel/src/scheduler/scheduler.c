@@ -23,8 +23,8 @@ static uint32_t runningPID = 0;
 uint32_t
 initScheduler()
 {
-	// want IRQ from timer every 100ms
-	timerInit( TIMER2_ID, 100 );
+	// want IRQ from timer every 1000ms
+	timerInit( TIMER2_ID, 1000 );
 
 	// NOTE: need to waste some time, otherwise IRQ won't hit
 	volatile uint32_t i = 100000;
@@ -91,14 +91,11 @@ createTask( task_func entryPoint )
 	Task newTask;
 	newTask.state = READY;
 	newTask.pid = getNextFreePID();
-
-	// need to increment by 4 bytes because return is done by SUBS ... #4, ONLY WHEN WE ARE IN IRQ, NOT IN SWI
-	newTask.pc = ( ( uint32_t* ) entryPoint ) + 1;
-
+	newTask.pc = ( uint32_t* ) entryPoint;
+	newTask.pc++; // TODO: move to IRQ handler in future
 	newTask.cpsr = 0x60000110; // user-mode and IRQs enabled
 
 	// TODO: need a valid stack-pointer
-	// TODO: check to what we need to set the LR (newTask.reg[ 14 ]
 	void* stackPtr = ( void*) malloc( 1024 );
 	memset( stackPtr, 'a', 1024 );
 

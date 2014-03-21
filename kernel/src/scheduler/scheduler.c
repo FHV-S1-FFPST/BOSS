@@ -24,7 +24,7 @@ uint32_t
 initScheduler()
 {
 	// want IRQ from timer every 100ms
-	timerInit( HAL_TIMER2, 100 );
+	timerInit( TIMER2_ID, 100 );
 
 	// NOTE: need to waste some time, otherwise IRQ won't hit
 	volatile uint32_t i = 100000;
@@ -50,13 +50,14 @@ schedule( uint32_t* userCpsr, uint32_t* userPc, uint32_t* userRegs )
 
 	uint32_t nextPID = getNextReady();
 	Task* task = getTask( nextPID );
-	if ( runningTask->state == READY )
+	if ( task->state == READY )
 	{
 		task->state = RUNNING;
-		//_schedule_asm( task->pc, task->cpsr, task->reg );
-		*userPc = runningTask->pc;
-		*userCpsr = runningTask->cpsr;
-		memcpy( userRegs, runningTask->reg, sizeof( runningTask->reg ) );
+		*userPc = task->pc;
+		*userCpsr = task->cpsr;
+		memcpy( userRegs, task->reg, sizeof( task->reg ) );
+
+		runningPID = nextPID;
 
 		// signal: a task was scheduled
 		ret = 1;
@@ -65,7 +66,7 @@ schedule( uint32_t* userCpsr, uint32_t* userPc, uint32_t* userRegs )
 	return ret;
 }
 
-static uint32_t
+uint32_t
 getNextReady()
 {
 	uint32_t i = 0;
@@ -73,7 +74,7 @@ getNextReady()
 
 	for ( i = 1; i <= MAX_TASKS; i++ )
 	{
-		pid = ( runningPID + i % MAX_TASKS );
+		pid = ( runningPID + i ) % MAX_TASKS ;
 
 		if( READY == getTask( pid )->state )
 		{
@@ -90,7 +91,7 @@ createTask( task_func entryPoint )
 	Task newTask;
 	newTask.state = READY;
 	newTask.pid = getNextFreePID();
-	newTask.pc = ( uint32_t* ) entryPoint;
+	newTask.pc = ( ( uint32_t ) entryPoint ) + 4; // need to increment by 4 bytes because return is done by SUBS ... #4
 	newTask.cpsr = 0x60000110; // user-mode and IRQs enabled
 
 	// TODO: need a valid stack-pointer

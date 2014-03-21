@@ -10,15 +10,13 @@
 
 // second includes: local includes
 #include "../scheduler/scheduler.h"
-#include "../timer/gptimer.h"
+#include "../timer/timer.h"
 
 // third includes: project-includes
 #include <boss.h>
 
 // fourth includes: clib and system-includes
 #include <stdarg.h>
-
-#include "../common/common.h"
 
 #pragma INTERRUPT ( undefInstrHandler, UDEF );
 #pragma INTERRUPT ( prefetchAbortHandler, PABT );
@@ -116,7 +114,7 @@ irqHandler( uint32_t irqNr, uint32_t* userCpsr, uint32_t* userPC, uint32_t* user
 	// TODO: set IRQ-interrupt flag
 
 	// clear interrupt flags
-	reg32w( GPTIMER2_BASE, GP_TIMER_IT_FLAG, 0x7 );
+	timerReset( TIMER2_ID );
 
 	return ret;
 }

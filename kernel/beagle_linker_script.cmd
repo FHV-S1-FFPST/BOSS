@@ -24,6 +24,8 @@ SECTIONS
 	.cinit      > ext_ddr
 	.cio        > ext_ddr
 
+	// TODO: add .heap section with meaningful value
+
 	.text       > ext_ddr
 	.sysmem     > ext_ddr
 

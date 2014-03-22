@@ -21,7 +21,6 @@
 
 // TODO: move to another include
 #define INTCPS_SIR_IRQ_ADDR 	0x48200040
-
 #define INTC_CONTROL 			0x48
 #define INTC_CONTROL_NEWIRQAGR	0x00000001
 #define SOC_AINTC_REGS			0x48200000
@@ -43,6 +42,7 @@ SystemState
 querySystemState( void )
 {
 	uint32_t cpsr = _get_CPSR();
+	// TODO: use reg32* macros
 	return BIT_CLEAR( cpsr, ~0x1F );
 }
 
@@ -101,7 +101,7 @@ irqHandler( UserContext* ctx )
 
 	// TODO: use func-pointers to jump to irqNr instead of branching
 
-	// TODO: make it more nice
+	// TODO: make it more nice -> will be nicer when using array of func-pointers
 	if ( 38 == ( irqNr & 127 ) )
 	{
 		ret = schedule( ctx );

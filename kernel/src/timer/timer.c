@@ -14,11 +14,14 @@
 void
 timerInit( uint32_t timerId, uint32_t intervalMs )
 {
+	// TODO: read chapter 16.2.6.1 about writing to registers in OMAP35x.pdf page 2630
+
 	INTC_MIRCLEAR_GTP |= UNMASK_GPT_INTERRUPT( timerId ); 		//unmask interrupt
 
 	timerStop( timerId );
 	timerReset( timerId );
 
+	// TODO: use reg32* macros
 	BIT_SET( TIER_GPT( timerId ), 0x1 );						//enable interrupts for given gpt
 	TMAR_GPT( timerId ) = intervalMs * HAL_TIMER_TICKS_PER_MS; 	//set compare value
 	BIT_SET( TCLR_GPT( timerId ), HAL_TIMER_CE_GPT );			//Enable Compare mode
@@ -29,6 +32,7 @@ timerInit( uint32_t timerId, uint32_t intervalMs )
 void
 timerStart( uint32_t timerId )
 {
+	// TODO: use reg32* macros
 	BIT_SET( TCLR_GPT( timerId ), HAL_TIMER_ON_GPT );
 	AWAIT_BITS_SET( TCLR_GPT( timerId ), HAL_TIMER_ON_GPT );
 }
@@ -36,6 +40,7 @@ timerStart( uint32_t timerId )
 void
 timerStop( uint32_t timerId )
 {
+	// TODO: use reg32* macros
 	BIT_CLEAR( TCLR_GPT( timerId ), HAL_TIMER_ON_GPT );
 	AWAIT_BITS_CLEARED( TCLR_GPT( timerId ), HAL_TIMER_ON_GPT );
 }
@@ -53,6 +58,7 @@ timerReset( uint32_t timerId )
 void
 timerSetInterruptMode( uint32_t timerId )
 {
+	// TODO: use reg32* macros
 	BIT_SET( INTC_ILR_GTP( timerId ), 0x1 );
 	AWAIT_BITS_SET( INTC_ILR_GTP( timerId ), 0x1 );
 }

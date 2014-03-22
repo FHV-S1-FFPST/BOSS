@@ -22,4 +22,7 @@ idleTask( void* args )
 		volatile uint32_t z = x1 + x2 + x3 + x4;
 		counter += z;
 	}
+
+	// TODO: handle exit of processes: through manipulating LR?
+	return 0;
 }

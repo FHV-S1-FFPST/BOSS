@@ -26,5 +26,4 @@ task2( void* args )
 	}
 
 	// TODO: handle exit of processes: through manipulating LR?
-	return 0;
 }

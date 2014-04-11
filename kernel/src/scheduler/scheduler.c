@@ -9,6 +9,7 @@
 #include <string.h>
 
 #include "scheduler.h"
+
 #include "../common/common.h"
 #include "../timer/timer.h"
 #include "../task/task.h"
@@ -23,47 +24,64 @@ static uint32_t runningPID = 0;
 uint32_t
 initScheduler()
 {
-	// want IRQ from timer every 1000ms
-	timerInit( TIMER2_ID, 1000 );
-
-	// NOTE: need to waste some time, otherwise IRQ won't hit
-	volatile uint32_t i = 100000;
-	while ( i > 0 )
-		--i;
-
 	return 0;
 }
 
-uint32_t
-schedule( UserContext* ctx )
+void
+saveCtxToTask( UserContext* ctx, Task* task)
 {
-	uint32_t ret = 0;
+	task->state = READY;
+	task->pc = ctx->pc;
+	task->cpsr = ctx->cpsr;
+	memcpy( task->reg, ctx->regs, sizeof( task->reg ) );
+}
 
-	Task* runningTask = getTask( runningPID );
-	if ( runningTask->state == RUNNING )
-	{
-		runningTask->state = READY;
-		runningTask->pc = ctx->pc;
-		runningTask->cpsr = ctx->cpsr;
-		memcpy( runningTask->reg, ctx->regs, sizeof( runningTask->reg ) );
-	}
+void
+restoreCtxFromTask( UserContext* ctx, Task* task )
+{
+	ctx->pc = task->pc;
+	ctx->cpsr = task->cpsr;
+	memcpy( ctx->regs, task->reg, sizeof( task->reg ) );
+}
 
+uint32_t
+scheduleNextReady( UserContext* ctx )
+{
 	uint32_t nextPID = getNextReady();
 	Task* task = getTask( nextPID );
 	if ( task->state == READY )
 	{
 		task->state = RUNNING;
-		ctx->pc = task->pc;
-		ctx->cpsr = task->cpsr;
-		memcpy( ctx->regs, task->reg, sizeof( task->reg ) );
+		restoreCtxFromTask( ctx, task );
 
 		runningPID = nextPID;
 
 		// signal: a task was scheduled
-		ret = 1;
+		return 1;
 	}
 
-	return ret;
+	return 0;
+}
+
+uint32_t
+saveCurrentRunning( UserContext* ctx )
+{
+	Task* runningTask = getTask( runningPID );
+	if ( runningTask->state == RUNNING )
+	{
+		saveCtxToTask( ctx, runningTask );
+	}
+
+	return 0;
+}
+
+
+uint32_t
+schedule( UserContext* ctx )
+{
+	saveCurrentRunning( ctx );
+
+	return scheduleNextReady( ctx );
 }
 
 uint32_t
@@ -71,12 +89,21 @@ getNextReady()
 {
 	uint32_t i = 0;
 	uint32_t pid = 0;
+	uint32_t currentMillis = getSysMillis();
 
 	for ( i = 1; i <= MAX_TASKS; i++ )
 	{
-		pid = ( runningPID + i ) % MAX_TASKS ;
+		Task* task = getTask( pid );
 
-		if( READY == getTask( pid )->state )
+		pid = ( runningPID + i ) % MAX_TASKS ;
+		if ( SLEEPING == task->state )
+		{
+			if ( task->sleepUntil <= currentMillis )
+			{
+				task->state = READY;
+			}
+		}
+		else if( READY == task->state )
 		{
 			return pid;
 		}
@@ -85,21 +112,32 @@ getNextReady()
 	return runningPID;
 }
 
+void allocateStackPointer( Task* task )
+{
+	// TODO: replace malloc by other facilitys when virtual memory and process creation is implemented
+	void* stackPtr = ( void*) malloc( 1024 );
+	memset( stackPtr, 'a', 1024 );
+
+	task->reg[ 13 ] = ( uint32_t ) stackPtr;
+}
+
+void initializeTask( Task* task, task_func entryPoint )
+{
+	task->state = READY;
+	task->pid = getNextFreePID();
+	task->pc = ( uint32_t* ) entryPoint;
+	task->pc++; 				// NOTE: increment program-counter by 4bytes because scheduling is done through IRQ-handler which will return by SUBS
+	task->cpsr = 0x60000110; // user-mode and IRQs enabled
+}
+
 int32_t
 createTask( task_func entryPoint )
 {
 	Task newTask;
-	newTask.state = READY;
-	newTask.pid = getNextFreePID();
-	newTask.pc = ( uint32_t* ) entryPoint;
-	newTask.pc++;
-	newTask.cpsr = 0x60000110; // user-mode and IRQs enabled
 
-	// TODO: need a valid stack-pointer
-	void* stackPtr = ( void*) malloc( 1024 );
-	memset( stackPtr, 'a', 1024 );
+	initializeTask( &newTask, entryPoint );
 
-	newTask.reg[ 13 ] = ( uint32_t ) stackPtr;
+	allocateStackPointer( &newTask );
 
 	addTask( &newTask );
 
@@ -110,21 +148,15 @@ int32_t
 fork()
 {
 	Task newTask;
-	newTask.state = READY;
-	newTask.pid = getNextFreePID();
-	newTask.pc = ( task_func ) currentUserCtx->pc;
-	newTask.pc++;	// TODO: do we need this?
-	newTask.cpsr = 0x60000110; // user-mode and IRQs enabled
 
-	// TODO: need a valid stack-pointer
-	void* stackPtr = ( void*) malloc( 1024 );
-	memset( stackPtr, 'a', 1024 );
+	initializeTask( &newTask, ( task_func ) currentUserCtx->pc );
 
-	// the child process will receive the registers of the parent process
+	allocateStackPointer( &newTask );
+
+	// the child process will receive the content of the registers of the parent process
 	memcpy( newTask.reg, currentUserCtx->regs, sizeof( newTask.reg ) );
 	// set register 0 of child-process to 0 to notify that the process is the child process
 	newTask.reg[ 0 ] = 0;
-	newTask.reg[ 13 ] = ( uint32_t ) stackPtr;
 
 	addTask( &newTask );
 
@@ -137,5 +169,20 @@ fork()
 int32_t
 sleep( uint32_t millis )
 {
+	Task* runningTask = getTask( runningPID );
+	// NOTE: runningTask MUST be in state Running
+	saveCtxToTask( currentUserCtx, runningTask );
+
+	uint32_t systemMillis = getSysMillis();
+
+	runningTask->state = SLEEPING;
+	runningTask->sleepUntil = systemMillis + millis;
+
+	// TODO: reschedule other task
+	// TODO: problem: when new to schedule task has never run, the PC will point one instruction too far because createtask incremented it
+	// 		 it is ok when it already ran because the current instruction is interrupted by the IRQ and thus not executed and needs to be executed again
+
+	scheduleNextReady( currentUserCtx );
+
 	return 0;
 }

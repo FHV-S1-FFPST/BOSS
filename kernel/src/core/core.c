@@ -30,12 +30,28 @@
 #pragma INTERRUPT ( dataAbortHandler, DABT );
 #pragma INTERRUPT ( fiqHandler, FIQ );
 
+#define IRQ_INTERVAL 1000
+
+static uint32_t systemMillis;
+
 int32_t
 initCore( void )
 {
-	// TODO: setup global kernel data-structure
+	// want IRQ from timer every IRQ_INTERVAL ms
+	timerInit( TIMER2_ID, IRQ_INTERVAL );
+
+	// NOTE: need to waste some time, otherwise IRQ won't hit
+	volatile uint32_t i = 100000;
+	while ( i > 0 )
+		--i;
 
 	return 0;
+}
+
+uint32_t
+getSysMillis()
+{
+	return systemMillis;
 }
 
 SystemState
@@ -100,6 +116,9 @@ irqHandler( UserContext* ctx )
 	uint32_t ret = 0;
 	// fetch irqNr
 	uint32_t irqNr = *( ( uint32_t* ) INTCPS_SIR_IRQ_ADDR );
+
+	// increment system-time
+	systemMillis += IRQ_INTERVAL;
 
 	// TODO: use func-pointers to jump to irqNr instead of branching
 

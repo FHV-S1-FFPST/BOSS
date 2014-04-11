@@ -11,7 +11,6 @@
 #include <boss.h>
 
 #define TIMER2_ID 2
-#define TIMER3_ID 3
 
 #define TIMER_ADDR( id )		0x49030000 + ( id - 1 ) * 0x2000
 
@@ -41,6 +40,6 @@ void timerStart( uint32_t timerId );
 void timerStop( uint32_t timerId );
 void timerReset( uint32_t timerId );
 void timerSetInterruptMode( uint32_t timerId );
-
+void timerCfg1MsTick();
 
 #endif /* TIMER_H_ */

@@ -17,33 +17,20 @@ task1( void* args )
 	{
 		while( 1 )
 		{
-			uint32_t x1 = 22;
-			uint32_t x2 = 23;
-			uint32_t x3 = 24;
-			uint32_t x4 = 25;
-
-			volatile uint32_t z = x1 + x2 + x3 + x4;
 			counter++;
 
-			sleep( 500 );
+			sleep( 5000 );
 		}
 	}
 	else
 	{
 		while( 1 )
 		{
-			uint32_t x1 = 22;
-			uint32_t x2 = 23;
-			uint32_t x3 = 24;
-			uint32_t x4 = 25;
-
-			volatile uint32_t z = x1 + x2 + x3 + x4;
 			counter++;
 
-			sleep( 1000 );
+			sleep( 2000 );
 		}
 	}
 
 	// TODO: handle exit of processes: through manipulating LR?
-	return 0;
 }

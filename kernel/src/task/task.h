@@ -14,7 +14,8 @@ typedef enum {
 	INVALID = 0,
 	READY,
 	RUNNING,
-	BLOCKED
+	BLOCKED,
+	SLEEPING
 } TaskState;
 
 typedef struct {
@@ -28,6 +29,9 @@ typedef struct {
 
 	// process control information
 	TaskState state;
+
+	// time to sleep
+	uint32_t sleepUntil;
 } Task;
 
 #endif /* TASK_H_ */

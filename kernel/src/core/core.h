@@ -29,8 +29,8 @@ typedef enum
 
 UserContext* currentUserCtx;
 
+uint32_t getSysMillis();
 int32_t initCore( void );
-
 SystemState querySystemState( void );
 
 #endif /* CORE_H_ */

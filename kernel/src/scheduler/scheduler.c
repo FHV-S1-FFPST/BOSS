@@ -92,7 +92,7 @@ createTask( task_func entryPoint )
 	newTask.state = READY;
 	newTask.pid = getNextFreePID();
 	newTask.pc = ( uint32_t* ) entryPoint;
-	newTask.pc++; // TODO: move to IRQ handler in future
+	newTask.pc++;
 	newTask.cpsr = 0x60000110; // user-mode and IRQs enabled
 
 	// TODO: need a valid stack-pointer
@@ -109,6 +109,28 @@ createTask( task_func entryPoint )
 int32_t
 fork()
 {
+	Task newTask;
+	newTask.state = READY;
+	newTask.pid = getNextFreePID();
+	newTask.pc = ( task_func ) currentUserCtx->pc;
+	newTask.pc++;	// TODO: do we need this?
+	newTask.cpsr = 0x60000110; // user-mode and IRQs enabled
+
+	// TODO: need a valid stack-pointer
+	void* stackPtr = ( void*) malloc( 1024 );
+	memset( stackPtr, 'a', 1024 );
+
+	// the child process will receive the registers of the parent process
+	memcpy( newTask.reg, currentUserCtx->regs, sizeof( newTask.reg ) );
+	// set register 0 of child-process to 0 to notify that the process is the child process
+	newTask.reg[ 0 ] = 0;
+	newTask.reg[ 13 ] = ( uint32_t ) stackPtr;
+
+	addTask( &newTask );
+
+	// fork will return 1 for caller which is the parent process
+	currentUserCtx->regs[ 0 ] = 1;
+
 	return 0;
 }
 

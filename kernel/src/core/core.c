@@ -52,6 +52,8 @@ swiHandler( uint32_t swiId, UserContext* ctx )
 {
 	int32_t ret = 0;
 
+	currentUserCtx = ctx;
+
 	if ( SYSC_SEND == swiId || SYSC_RECEIVE == swiId || SYSC_SENDRCV == swiId )
 	{
 		uint8_t* data = ( uint8_t* ) ctx->regs[ 1 ];

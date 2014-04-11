@@ -27,6 +27,8 @@ typedef enum
 	SYSTEM = 0x1F,
 } SystemState;
 
+UserContext* currentUserCtx;
+
 int32_t initCore( void );
 
 SystemState querySystemState( void );

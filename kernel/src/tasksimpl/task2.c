@@ -20,7 +20,9 @@ task2( void* args )
 		uint32_t x4 = 35;
 
 		volatile uint32_t z = x1 + x2 + x3 + x4;
-		counter += z;
+		counter++;
+
+		sleep( 1000 );
 	}
 
 	// TODO: handle exit of processes: through manipulating LR?

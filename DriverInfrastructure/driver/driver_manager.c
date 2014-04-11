@@ -6,7 +6,7 @@
  */
 
 #include "driver_manager.h"
-#include "stdlib.h"
+#define NULL ((void*)0)
 
 static Driver_t loadedDrivers[2];
 

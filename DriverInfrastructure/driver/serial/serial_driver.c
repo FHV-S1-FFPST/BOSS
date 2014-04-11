@@ -10,7 +10,7 @@
 #include "../return_code.h"
 #include "../ioctl.h"
 
-#include "stdlib.h"
+#define NULL ((void*)0)
 
 #define UART3_BASE 0x49020000
 

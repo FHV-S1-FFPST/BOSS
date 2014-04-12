@@ -12,7 +12,6 @@
 
 #define reg32r(b, r) (*(volatile uint32_t *)((b)+(r)))
 #define reg32w(b, r, v) (*((volatile uint32_t *)((b)+(r))) = (v))
-
 #define reg32m(b, r, v) ( *( ( volatile uint32_t* ) ( b + r ) ) |= ( v ) )
 
 #define BIT_SET( val, bits ) val |= bits
@@ -22,8 +21,5 @@
 #define AWAIT_BITS_SET( val, bits ) while ( ! ( val & bits ) ) {}
 #define AWAIT_BITS_CLEARED( val, bits ) while ( val & bits ) {}
 #define AWAIT_BITS_ALL_CLEARED( val ) while ( val ) {}
-
-#define INTCPS_MIR_CLEAR1 0x482000A8
-#define INTCPS_SIR_IRQ 0x48200040
 
 #endif /* COMMON_H_ */

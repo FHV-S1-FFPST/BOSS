@@ -10,7 +10,8 @@
 
 // second includes: local includes
 #include "../scheduler/scheduler.h"
-#include "../timer/timer.h"
+#include "../timer/irqtimer.h"
+#include "../timer/systimer.h"
 #include "../common/common.h"
 
 // third includes: project-includes
@@ -32,14 +33,14 @@
 
 #define IRQ_INTERVAL 1000
 
-static uint32_t systemMillis;
-
 int32_t
 initCore( void )
 {
 	// want IRQ from timer every IRQ_INTERVAL ms
-	timerInit( TIMER2_ID, IRQ_INTERVAL );
+	irqTimerInit( IRQ_INTERVAL );
+	sysTimerInit();
 
+	// TODO: this shouldnt be necessary anymore because this is handled inside timer
 	// NOTE: need to waste some time, otherwise IRQ won't hit
 	volatile uint32_t i = 100000;
 	while ( i > 0 )
@@ -49,9 +50,9 @@ initCore( void )
 }
 
 uint32_t
-getSysMillis()
+getSysMillis( void )
 {
-	return systemMillis;
+	return sysTimerValue();
 }
 
 SystemState
@@ -117,9 +118,6 @@ irqHandler( UserContext* ctx )
 	// fetch irqNr
 	uint32_t irqNr = *( ( uint32_t* ) INTCPS_SIR_IRQ_ADDR );
 
-	// increment system-time
-	systemMillis += IRQ_INTERVAL;
-
 	// TODO: use func-pointers to jump to irqNr instead of branching
 
 	// TODO: make it more nice -> will be nicer when using array of func-pointers
@@ -131,8 +129,9 @@ irqHandler( UserContext* ctx )
 	// TODO: use func-pointers to jump to reset-handlers, to decouple reset-functionality from irq functionality
 
 	// reset and clear timer interrupt flags
-	timerReset( TIMER2_ID );
+	irqTimerReset();
 
+	// TODO: remove from here
 	// reset IRQ-interrupt flag
 	reg32m( SOC_AINTC_REGS, INTC_CONTROL, INTC_CONTROL_NEWIRQAGR );
 

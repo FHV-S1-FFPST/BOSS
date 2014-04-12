@@ -11,7 +11,6 @@
 #include "scheduler.h"
 
 #include "../common/common.h"
-#include "../timer/timer.h"
 #include "../task/task.h"
 #include "../task/taskTable.h"
 

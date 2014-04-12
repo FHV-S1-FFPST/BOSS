@@ -178,7 +178,6 @@ sleep( uint32_t millis )
 	runningTask->state = SLEEPING;
 	runningTask->sleepUntil = systemMillis + millis;
 
-	// TODO: reschedule other task
 	// TODO: problem: when new to schedule task has never run, the PC will point one instruction too far because createtask incremented it
 	// 		 it is ok when it already ran because the current instruction is interrupted by the IRQ and thus not executed and needs to be executed again
 

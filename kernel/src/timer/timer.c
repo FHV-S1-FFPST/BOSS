@@ -9,6 +9,40 @@
 
 #include "../common/common.h"
 
+
+#define TIDR_GPT( addr )		( *( ( volatile uint32_t* ) ( addr + 0x000 ) ) )	// R
+#define TIOCP_CFG_GPT( addr )	( *( ( volatile uint32_t* ) ( addr + 0x010 ) ) )	// RW
+#define TISTAT_GPT( addr )		( *( ( volatile uint32_t* ) ( addr + 0x014 ) ) )	// R
+#define TISR_GPT( addr )		( *( ( volatile uint32_t* ) ( addr + 0x018 ) ) )	// RW
+#define TIER_GPT( addr )		( *( ( volatile uint32_t* ) ( addr + 0x01C ) ) )	// RW
+#define TWER_GPT( addr )		( *( ( volatile uint32_t* ) ( addr + 0x020 ) ) )	// RW
+#define TCLR_GPT( addr )		( *( ( volatile uint32_t* ) ( addr + 0x024 ) ) )	// RW
+#define TCRR_GPT( addr )		( *( ( volatile uint32_t* ) ( addr + 0x028 ) ) )	// RW
+#define TLDR_GPT( addr ) 		( *( ( volatile uint32_t* ) ( addr + 0x02C ) ) )	// RW
+#define TTGR_GPT( addr ) 		( *( ( volatile uint32_t* ) ( addr + 0x030 ) ) )	// RW
+#define TWPS_GPT( addr ) 		( *( ( volatile uint32_t* ) ( addr + 0x034 ) ) )	// R
+#define TMAR_GPT( addr )		( *( ( volatile uint32_t* ) ( addr + 0x038 ) ) )	// RW
+#define TCAR1_GPT( addr )		( *( ( volatile uint32_t* ) ( addr + 0x03C ) ) )	// R
+#define TSICR_GPT( addr )		( *( ( volatile uint32_t* ) ( addr + 0x040 ) ) )	// RW
+#define TCAR2_GPT( addr )		( *( ( volatile uint32_t* ) ( addr + 0x044 ) ) )	// R
+#define TPIR_GPT( addr )		( *( ( volatile uint32_t* ) ( addr + 0x048 ) ) )	// RW
+#define TNIR_GPT( addr )		( *( ( volatile uint32_t* ) ( addr + 0x04C ) ) )	// RW
+#define TCVR_GPT( addr )		( *( ( volatile uint32_t* ) ( addr + 0x050 ) ) )	// RW
+#define TOCR_GPT( addr )		( *( ( volatile uint32_t* ) ( addr + 0x054 ) ) )	// RW
+#define TOWR_GPT( addr )		( *( ( volatile uint32_t* ) ( addr + 0x058 ) ) )	// RW
+
+#define INTC_ILR_GTP(number)      ( *((volatile uint32_t*) ((long)0x48200100 + 0x4 * (36 + number))))        // 0x4820 01000 + 0x98 (0x04*38)
+
+#define INTC_MIRCLEAR_GTP (*((volatile uint32_t*) 0x482000A8))     //0x4820 0088 + (0x20 * 1)
+#define INTCPS_CONTROL (*((volatile uint32_t*) 0x48200048))
+
+#define HAL_TIMER_CE_GPT                              0x40
+#define HAL_TIMER_ON_GPT                              0x01
+#define HAL_TIMER_AR_GPT                              0x02
+#define HAL_TIMER_CLEAR_INTERRUPT                     0x07
+
+#define UNMASK_GPT_INTERRUPT(number)    0x10 << number
+
 #define HAL_TIMER_TICKS_PER_MS 1000
 
 void

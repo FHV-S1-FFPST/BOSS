@@ -10,17 +10,16 @@
 
 #include <inttypes.h>
 
-typedef uint32_t ( *irq_clbk ) ( void );
-
 // TODO: implement configuration of IRQ and FIRQ through irqtimer
 // TODO: move irqtimer in this directory
-// TODO: implement registration of function-pointers as IRQ callbacks
 
-#define GPT2_IRQ 38
+#define GPT2_IRQ 		38
+#define GPT10_IRQ 		46
+
+typedef uint32_t ( *irq_clbk ) ( void );
 
 uint32_t irqInit();
 void irqEnable();
-
 void irqRegisterClbk( irq_clbk, uint32_t irqId );
 
 #endif /* IRQ_H_ */

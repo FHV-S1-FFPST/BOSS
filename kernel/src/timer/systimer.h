@@ -10,7 +10,7 @@
 
 #include <inttypes.h>
 
-void sysTimerInit( void );
+void sysTimerInit( uint32_t ovfAfterMs );
 uint32_t sysTimerValue( void );
 
 #endif /* SYSTIMER_H_ */

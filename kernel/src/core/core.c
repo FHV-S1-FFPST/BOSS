@@ -12,6 +12,7 @@
 #include "../scheduler/scheduler.h"
 #include "../timer/systimer.h"
 #include "../common/common.h"
+#include "../irq/irq.h"
 
 // third includes: project-includes
 #include <boss.h>
@@ -20,11 +21,29 @@
 #pragma INTERRUPT ( prefetchAbortHandler, PABT );
 #pragma INTERRUPT ( dataAbortHandler, DABT );
 
+#define SYSTIMER_OVERFLOW_INTERVAL_MS 10000
+
+uint64_t systemMillis;
+
+uint32_t
+handleSystemTimerOverflow()
+{
+	// NOTE: every SYSTIMER_OVERFLOW_INTERVAL_MS milliseconds the system-timer will
+	// overflow. The system-timer is driven by the TOCR register which is a 24-bit
+	// register so SYSTIMER_OVERFLOW_INTERVAL_MS will be most likely set to 0x00FFFFFF
+	// thus after 0x00FFFFFF ms an overflow will be generated which allows the
+	// global system-milliseconds to be incremented by SYSTIMER_OVERFLOW_INTERVAL_MS
+	// so it is possible to maintain a uint64_t systemmilliseconds value
+	systemMillis += SYSTIMER_OVERFLOW_INTERVAL_MS;
+
+	return 0;
+}
 
 int32_t
 initCore( void )
 {
-	sysTimerInit();
+	sysTimerInit( SYSTIMER_OVERFLOW_INTERVAL_MS );
+	irqRegisterClbk( handleSystemTimerOverflow, GPT10_IRQ );
 
 	// TODO: this shouldnt be necessary anymore because this is handled inside timer
 	// NOTE: need to waste some time, otherwise IRQ won't hit
@@ -35,10 +54,10 @@ initCore( void )
 	return 0;
 }
 
-uint32_t
+uint64_t
 getSysMillis( void )
 {
-	return sysTimerValue();
+	return systemMillis + sysTimerValue();
 }
 
 SystemState

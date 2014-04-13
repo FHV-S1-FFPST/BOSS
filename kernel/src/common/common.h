@@ -10,12 +10,12 @@
 
 #include <boss.h>
 
-#define reg32r(b, r) (*(volatile uint32_t *)((b)+(r)))
-#define reg32w(b, r, v) (*((volatile uint32_t *)((b)+(r))) = (v))
-#define reg32m(b, r, v) ( *( ( volatile uint32_t* ) ( b + r ) ) |= ( v ) )
+#define READ_REGISTER( addr ) (*(volatile uint32_t *)( addr ))
+#define READ_REGISTER_OFFSET( base, offset ) (*(volatile uint32_t *)((base)+(offset)))
 
 #define BIT_SET( val, bits ) val |= bits
 #define BIT_CLEAR( val, bits ) val &= ~bits
+#define BIT_KEEP( val, bits ) val &= bits
 #define BIT_CLEAR_ALL( val ) val = 0x0
 
 #define AWAIT_BITS_SET( val, bits ) while ( ! ( val & bits ) ) {}

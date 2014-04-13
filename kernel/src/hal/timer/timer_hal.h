@@ -36,10 +36,13 @@ void halTimerClearInterrupt( uint32_t addr, uint32_t itBit );
 void halTimerEnableInterrupt( uint32_t addr, uint32_t itBit );
 void halTimerSetCompareValue( uint32_t addr, uint32_t v );
 void halTimerEnableCompare( uint32_t addr );
+void halTimerEnableOverflow( uint32_t addr );
 void halTimerSetLoadValue( uint32_t addr, uint32_t v );
 void halTimerEnableAutoReload( uint32_t addr );
 void halTimerSetPosInc( uint32_t addr, uint32_t v );
 void halTimerSetNegInc( uint32_t addr, int32_t v );
+void halTimerSetOvfWrapping( uint32_t addr, int32_t v );
+void halTimerSetOvfMaskValue( uint32_t addr, int32_t v );
 uint32_t halTimerCounterValue( uint32_t addr );
 uint32_t halTimerOvfMaskValue( uint32_t addr );
 

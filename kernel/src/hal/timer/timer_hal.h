@@ -38,10 +38,11 @@ void halTimerSetCompareValue( uint32_t addr, uint32_t v );
 void halTimerEnableCompare( uint32_t addr );
 void halTimerSetLoadValue( uint32_t addr, uint32_t v );
 void halTimerEnableAutoReload( uint32_t addr );
+void halTimerSetPosInc( uint32_t addr, uint32_t v );
+void halTimerSetNegInc( uint32_t addr, int32_t v );
+uint32_t halTimerCounterValue( uint32_t addr );
+uint32_t halTimerOvfMaskValue( uint32_t addr );
 
-// TODO: need functions to configure 1ms tick timer
-// 		-> select clock interval (32khz, 1Mhz, ... system-clock)
-//		-> set positive/negative increment
-//		-> ... ?
+// TODO: -> select clock interval (32khz, 1Mhz, ... system-clock) ?
 
 #endif /* TIMER_HAL_H_ */

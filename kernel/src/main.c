@@ -1,6 +1,6 @@
 #include "core/core.h"
 #include "scheduler/scheduler.h"
-#include "timer/irqtimer.h"
+#include "irq/irq.h"
 
 #include "tasksimpl/idle.h"
 #include "tasksimpl/task1.h"
@@ -81,7 +81,12 @@ initOs( void )
 		return 1;
 	}
 
-	if( initScheduler() )
+	if ( irqInit() )
+	{
+		return 1;
+	}
+
+	if( schedInit() )
 	{
 		return 1;
 	}
@@ -121,11 +126,7 @@ initSystem( void )
 	// Start some test-processes to test our scheduler
 	createTask( idleTask );
 
-	// enable IRQs AFTER we created the initial tasks
-	// => when scheduling is called at least the idle-task is available
-	_enable_IRQ();
-
-	irqTimerStart();
+	irqEnable();
 
 	return 0;
 }

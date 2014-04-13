@@ -127,3 +127,29 @@ halTimerEnableAutoReload( uint32_t addr )
 	// NOTE: enable auto-reload by setting bit 1 of TCLR
 	BIT_SET( TCLR_GPT( addr ), TCLR_AUTORELOAD_BIT );
 }
+
+void
+halTimerSetPosInc( uint32_t addr, uint32_t v )
+{
+	// NOTE: only available for GPTIMERS 1,2 & 10
+	TPIR_GPT( addr ) = v;
+}
+
+void
+halTimerSetNegInc( uint32_t addr, int32_t v )
+{
+	// NOTE: only available for GPTIMERS 1,2 & 10
+	TNIR_GPT( addr ) = v;
+}
+
+uint32_t
+halTimerCounterValue( uint32_t addr )
+{
+	return TCRR_GPT( addr );
+}
+
+uint32_t
+halTimerOvfMaskValue( uint32_t addr )
+{
+	return TOCR_GPT( addr );
+}

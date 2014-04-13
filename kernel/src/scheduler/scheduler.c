@@ -13,6 +13,7 @@
 #include "../common/common.h"
 #include "../task/task.h"
 #include "../task/taskTable.h"
+#include "../irq/irq.h"
 
 // prototypes of this module
 uint32_t getNextReady();
@@ -21,8 +22,10 @@ int32_t createTask( task_func entryPoint );
 static uint32_t runningPID = 0;
 
 uint32_t
-initScheduler()
+schedInit()
 {
+	irqRegisterClbk( schedule, GPT2_IRQ );
+
 	return 0;
 }
 
@@ -76,8 +79,10 @@ saveCurrentRunning( UserContext* ctx )
 
 
 uint32_t
-schedule( UserContext* ctx )
+schedule()
 {
+	UserContext* ctx = currentUserCtx;
+
 	saveCurrentRunning( ctx );
 
 	return scheduleNextReady( ctx );

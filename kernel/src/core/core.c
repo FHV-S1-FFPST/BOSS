@@ -10,34 +10,20 @@
 
 // second includes: local includes
 #include "../scheduler/scheduler.h"
-#include "../timer/irqtimer.h"
 #include "../timer/systimer.h"
 #include "../common/common.h"
 
 // third includes: project-includes
 #include <boss.h>
 
-// fourth includes: clib and system-includes
-#include <stdarg.h>
-
-// TODO: move to another include
-#define INTCPS_SIR_IRQ_ADDR 	0x48200040
-#define INTC_CONTROL 			0x48
-#define INTC_CONTROL_NEWIRQAGR	0x00000001
-#define SOC_AINTC_REGS			0x48200000
-
 #pragma INTERRUPT ( undefInstrHandler, UDEF );
 #pragma INTERRUPT ( prefetchAbortHandler, PABT );
 #pragma INTERRUPT ( dataAbortHandler, DABT );
-#pragma INTERRUPT ( fiqHandler, FIQ );
 
-#define IRQ_INTERVAL 1000
 
 int32_t
 initCore( void )
 {
-	// want IRQ from timer every IRQ_INTERVAL ms
-	irqTimerInit( IRQ_INTERVAL );
 	sysTimerInit();
 
 	// TODO: this shouldnt be necessary anymore because this is handled inside timer
@@ -111,33 +97,6 @@ swiHandler( uint32_t swiId, UserContext* ctx )
 	return ret;
 }
 
-uint32_t
-irqHandler( UserContext* ctx )
-{
-	uint32_t ret = 0;
-	// fetch irqNr
-	uint32_t irqNr = *( ( uint32_t* ) INTCPS_SIR_IRQ_ADDR );
-
-	// TODO: use func-pointers to jump to irqNr instead of branching
-
-	// TODO: make it more nice -> will be nicer when using array of func-pointers
-	if ( 38 == ( irqNr & 127 ) )
-	{
-		ret = schedule( ctx );
-	}
-
-	// TODO: use func-pointers to jump to reset-handlers, to decouple reset-functionality from irq functionality
-
-	// reset and clear timer interrupt flags
-	irqTimerReset();
-
-	// TODO: remove from here
-	// reset IRQ-interrupt flag
-	reg32m( SOC_AINTC_REGS, INTC_CONTROL, INTC_CONTROL_NEWIRQAGR );
-
-	return ret;
-}
-
 interrupt
 void prefetchAbortHandler()
 {
@@ -152,12 +111,6 @@ void dataAbortHandler()
 
 interrupt
 void undefInstrHandler()
-{
-	// implement when necessary
-}
-
-interrupt
-void fiqHandler()
 {
 	// implement when necessary
 }

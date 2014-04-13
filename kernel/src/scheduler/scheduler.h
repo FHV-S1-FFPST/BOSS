@@ -12,7 +12,7 @@
 
 #include "../core/core.h"
 
-uint32_t initScheduler( void );
-uint32_t schedule( UserContext* ctx );
+uint32_t schedInit( void );
+uint32_t schedule( void );
 
 #endif /* SCHEDULER_H_ */

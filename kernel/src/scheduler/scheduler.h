@@ -8,11 +8,9 @@
 #ifndef SCHEDULER_H_
 #define SCHEDULER_H_
 
-#include <boss.h>
-
-#include "../core/core.h"
+#include <inttypes.h>
 
 uint32_t schedInit( void );
-uint32_t schedule( void );
+void schedStart( void );
 
 #endif /* SCHEDULER_H_ */

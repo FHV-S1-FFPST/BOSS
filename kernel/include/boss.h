@@ -30,6 +30,9 @@
 #define SYSC_CREATETASK			11
 #define SYSC_FORK				12
 #define SYSC_SLEEP				13
+
+// MISC CALLS
+#define SYSC_SYSMILLIS			14
 ///////////////////////////////////////////////////////////////////////////////
 
 // defined SWI-aliases for the given sys-calls for user-apps //////////////////
@@ -43,6 +46,9 @@
 	#pragma SWI_ALIAS( createTask, SYSC_CREATETASK );
 	#pragma SWI_ALIAS( fork, SYSC_FORK );
 	#pragma SWI_ALIAS( sleep, SYSC_SLEEP );
+
+	// MISC CALLS
+	#pragma SWI_ALIAS( getSysMillis, SYSC_SYSMILLIS );
 #endif
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -84,6 +90,10 @@ int32_t fork();
  */
 int32_t sleep( uint32_t millis );
 
+/**
+ * Returns the milliseconds since the system was started.
+ */
+uint64_t getSysMillis();
 ///////////////////////////////////////////////////////////////////////////////
 
 #endif /* BOSS_H_ */

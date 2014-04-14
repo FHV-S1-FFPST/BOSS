@@ -8,15 +8,12 @@
 #ifndef IRQ_H_
 #define IRQ_H_
 
-#include <inttypes.h>
-
-// TODO: implement configuration of IRQ and FIRQ through irqtimer
-// TODO: move irqtimer in this directory
+#include "../core/core.h"
 
 #define GPT2_IRQ 		38
 #define GPT10_IRQ 		46
 
-typedef uint32_t ( *irq_clbk ) ( void );
+typedef uint32_t ( *irq_clbk ) ( UserContext* ctx );
 
 uint32_t irqInit();
 void irqEnable();

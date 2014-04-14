@@ -26,7 +26,7 @@
 uint64_t systemMillis;
 
 uint32_t
-handleSystemTimerOverflow()
+handleSystemTimerOverflow( UserContext* ctx )
 {
 	// NOTE: every SYSTIMER_OVERFLOW_INTERVAL_MS milliseconds the system-timer will
 	// overflow. The system-timer is driven by the TOCR register which is a 24-bit
@@ -58,6 +58,19 @@ uint64_t
 getSysMillis( void )
 {
 	return systemMillis + sysTimerValue();
+}
+
+uint32_t
+getSysMillisSysCall( void )
+{
+	uint64_t sysMillis = getSysMillis();
+
+	// NOTE: because sysMillis is a 64bit wide we need to distribute it over R0 and R1
+	// TODO: debug
+	currentUserCtx->regs[ 0 ] = sysMillis & 0xFFFFFFFF;
+	currentUserCtx->regs[ 1 ] = ( sysMillis >> 31 ) & 0xFFFFFFFF;
+
+	return 0;
 }
 
 SystemState
@@ -107,6 +120,10 @@ swiHandler( uint32_t swiId, UserContext* ctx )
 	else if ( SYSC_SLEEP == swiId )
 	{
 		ret = sleep( ctx->regs[ 0 ] );
+	}
+	else if ( SYSC_SYSMILLIS == swiId )
+	{
+		ret = getSysMillisSysCall();
 	}
 	else
 	{

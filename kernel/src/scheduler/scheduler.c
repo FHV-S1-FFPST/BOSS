@@ -10,23 +10,41 @@
 
 #include "scheduler.h"
 
+#include "../core/core.h"
 #include "../common/common.h"
 #include "../task/task.h"
 #include "../task/taskTable.h"
+#include "../timer/irqtimer.h"
 #include "../irq/irq.h"
+
+static uint32_t runningPID = 0;
+
+#define SCHEDULE_INTERVAL_MS			1000
 
 // prototypes of this module
 uint32_t getNextReady();
 int32_t createTask( task_func entryPoint );
-
-static uint32_t runningPID = 0;
+uint32_t schedule( UserContext* ctx );			// IRQ callback prototype
 
 uint32_t
 schedInit()
 {
 	irqRegisterClbk( schedule, GPT2_IRQ );
+	irqTimerInit( SCHEDULE_INTERVAL_MS );
+
+	// TODO: this shouldnt be necessary anymore because this is handled inside timer
+	// NOTE: need to waste some time, otherwise IRQ won't hit
+	volatile uint32_t i = 100000;
+	while ( i > 0 )
+		--i;
 
 	return 0;
+}
+
+void
+schedStart()
+{
+	irqTimerStart();
 }
 
 void
@@ -77,15 +95,19 @@ saveCurrentRunning( UserContext* ctx )
 	return 0;
 }
 
-
+// NOTE: this is a callback called by irq
 uint32_t
-schedule()
+schedule( UserContext* ctx )
 {
-	UserContext* ctx = currentUserCtx;
+	uint32_t ret = 0;
 
 	saveCurrentRunning( ctx );
 
-	return scheduleNextReady( ctx );
+	ret = scheduleNextReady( ctx );
+
+	irqTimerReset();
+
+	return ret;
 }
 
 uint32_t

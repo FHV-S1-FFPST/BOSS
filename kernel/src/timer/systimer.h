@@ -11,6 +11,7 @@
 #include <inttypes.h>
 
 void sysTimerInit( uint32_t ovfAfterMs );
+void sysTimerResetInterrupt();
 uint32_t sysTimerValue( void );
 
 #endif /* SYSTIMER_H_ */

@@ -31,15 +31,15 @@ irqTimerInit( uint32_t irqIntervalMs )
 	halTimerSetLoadValue( IRQTIMER_ADDR, 0x0 );
 	// reload
 	halTimerEnableAutoReload( IRQTIMER_ADDR );
-
 	// reset
-	irqTimerReset();
+	halTimerReset( IRQTIMER_ADDR );
 }
 
 void
-irqTimerReset( void )
+irqTimerResetCounterAndInterrupt( void )
 {
 	halTimerReset( IRQTIMER_ADDR );
+	halTimerClearAllInterrupts( IRQTIMER_ADDR );
 }
 
 void

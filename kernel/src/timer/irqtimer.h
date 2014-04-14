@@ -11,7 +11,7 @@
 #include <inttypes.h>
 
 void irqTimerInit( uint32_t irqIntervalMs );
-void irqTimerReset( void );
+void irqTimerResetCounterAndInterrupt( void );
 void irqTimerStart( void );
 void irqTimerStop( void );
 

@@ -19,7 +19,11 @@ task1( void* args )
 		{
 			counter++;
 
-			sleep( 5000 );
+			uint64_t sysMillis = getSysMillis();
+
+			sleep( 10000 );
+
+			sysMillis = getSysMillis();
 		}
 	}
 	else
@@ -28,7 +32,11 @@ task1( void* args )
 		{
 			counter++;
 
-			sleep( 2000 );
+			uint64_t sysMillis = getSysMillis();
+
+			sleep( 10000 );
+
+			sysMillis = getSysMillis();
 		}
 	}
 

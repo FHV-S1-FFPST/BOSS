@@ -23,7 +23,7 @@ sysTimerInit( uint32_t ovfAfterMs )
 	// TODO: disable post-mode
 	// TODO: disable prescaler
 	// clear all pending interrupts before reset
-	halTimerClearAllInterrupts( SYSTIMER_ADDR );
+	sysTimerResetInterrupt();
 
 	// NOTE: config for 1ms tick (see OMAP35x.pdf page 2625 )
 	halTimerSetPosInc( SYSTIMER_ADDR, POSINC_1MSTICK_VALUE );
@@ -51,9 +51,16 @@ sysTimerInit( uint32_t ovfAfterMs )
 	halTimerStart( SYSTIMER_ADDR );
 }
 
+void
+sysTimerResetInterrupt()
+{
+	halTimerClearAllInterrupts( SYSTIMER_ADDR );
+}
+
 uint32_t
 sysTimerValue( void )
 {
-	// NOTE:
+	// NOTE: we count the 1ms overflows, so the value of the timer is the
+	// overflow counter of the masked overflow events
 	return halTimerOvfMaskValue( SYSTIMER_ADDR );
 }

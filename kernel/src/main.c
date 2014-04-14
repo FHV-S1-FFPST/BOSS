@@ -124,9 +124,11 @@ initSystem( void )
 	createTask( task1 );
 
 	// Start some test-processes to test our scheduler
-	createTask( idleTask );
+	//createTask( idleTask );
 
 	irqEnable();
+
+	schedStart();
 
 	return 0;
 }

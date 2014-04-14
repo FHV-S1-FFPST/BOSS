@@ -26,6 +26,8 @@ uint32_t getNextReady();
 int32_t createTask( task_func entryPoint );
 uint32_t schedule( UserContext* ctx );			// IRQ callback prototype
 
+// TODO: idle-process MUST NOT be in normal task-list otherwise it will be scheduled round robin
+
 uint32_t
 schedInit()
 {
@@ -105,7 +107,7 @@ schedule( UserContext* ctx )
 
 	ret = scheduleNextReady( ctx );
 
-	irqTimerReset();
+	irqTimerResetCounterAndInterrupt();
 
 	return ret;
 }
@@ -114,19 +116,19 @@ uint32_t
 getNextReady()
 {
 	uint32_t i = 0;
-	uint32_t pid = 0;
 	uint32_t currentMillis = getSysMillis();
 
 	for ( i = 1; i <= MAX_TASKS; i++ )
 	{
+		uint32_t pid = ( runningPID + i ) % MAX_TASKS;
 		Task* task = getTask( pid );
 
-		pid = ( runningPID + i ) % MAX_TASKS ;
 		if ( SLEEPING == task->state )
 		{
 			if ( task->sleepUntil <= currentMillis )
 			{
 				task->state = READY;
+				return pid;
 			}
 		}
 		else if( READY == task->state )

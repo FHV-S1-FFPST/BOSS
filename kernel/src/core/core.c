@@ -36,6 +36,8 @@ handleSystemTimerOverflow( UserContext* ctx )
 	// so it is possible to maintain a uint64_t systemmilliseconds value
 	systemMillis += SYSTIMER_OVERFLOW_INTERVAL_MS;
 
+	sysTimerResetInterrupt();
+
 	return 0;
 }
 

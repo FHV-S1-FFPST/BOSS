@@ -21,7 +21,7 @@
 #pragma INTERRUPT ( prefetchAbortHandler, PABT );
 #pragma INTERRUPT ( dataAbortHandler, DABT );
 
-#define SYSTIMER_OVERFLOW_INTERVAL_MS 10000
+#define SYSTIMER_OVERFLOW_INTERVAL_MS 0xFFFFFF
 
 uint64_t systemMillis;
 

@@ -22,6 +22,8 @@ typedef struct {
 	// process identification
 	uint32_t pid;
 
+	uint32_t* initPC;
+
 	// processor state information
 	uint32_t* pc;
 	uint32_t reg[15];

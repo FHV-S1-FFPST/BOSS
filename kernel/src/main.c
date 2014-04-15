@@ -2,7 +2,6 @@
 #include "scheduler/scheduler.h"
 #include "irq/irq.h"
 
-#include "tasksimpl/idle.h"
 #include "tasksimpl/task1.h"
 
 /**
@@ -120,11 +119,7 @@ initSystem( void )
 {
 	// NOTE: at this point we should be able to send through RS232
 
-	// NOTE: DON'T remove this task, the scheduler assumes that there is at least one task in the system: the idle-task
 	createTask( task1 );
-
-	// Start some test-processes to test our scheduler
-	//createTask( idleTask );
 
 	irqEnable();
 

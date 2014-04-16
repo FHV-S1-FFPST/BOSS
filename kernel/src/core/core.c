@@ -9,7 +9,6 @@
 #include "core.h"
 
 // second includes: local includes
-#include "../scheduler/scheduler.h"
 #include "../timer/systimer.h"
 #include "../common/common.h"
 #include "../irq/irq.h"
@@ -23,23 +22,12 @@
 
 #define SYSTIMER_OVERFLOW_INTERVAL_MS 0xFFFFFF
 
-uint64_t systemMillis;
-
-uint32_t
-handleSystemTimerOverflow( UserContext* ctx )
-{
-	// NOTE: every SYSTIMER_OVERFLOW_INTERVAL_MS milliseconds the system-timer will
-	// overflow. The system-timer is driven by the TOCR register which is a 24-bit
-	// register so SYSTIMER_OVERFLOW_INTERVAL_MS will be most likely set to 0x00FFFFFF
-	// thus after 0x00FFFFFF ms an overflow will be generated which allows the
-	// global system-milliseconds to be incremented by SYSTIMER_OVERFLOW_INTERVAL_MS
-	// so it is possible to maintain a uint64_t systemmilliseconds value
-	systemMillis += SYSTIMER_OVERFLOW_INTERVAL_MS;
-
-	sysTimerResetInterrupt();
-
-	return 0;
-}
+// module-local data //////////////////////////////////////////////
+static uint64_t systemMillis;
+// module-local functions /////////////////////////////////////////
+static uint32_t handleSystemTimerOverflow( UserContext* ctx );
+static uint32_t getSysMillisSysCall( void );
+///////////////////////////////////////////////////////////////////
 
 int32_t
 initCore( void )
@@ -60,19 +48,6 @@ uint64_t
 getSysMillis( void )
 {
 	return systemMillis + sysTimerValue();
-}
-
-uint32_t
-getSysMillisSysCall( void )
-{
-	uint64_t sysMillis = getSysMillis();
-
-	// NOTE: because sysMillis is a 64bit wide we need to distribute it over R0 and R1
-	// TODO: debug
-	currentUserCtx->regs[ 0 ] = sysMillis & 0xFFFFFFFF;
-	currentUserCtx->regs[ 1 ] = ( sysMillis >> 31 ) & 0xFFFFFFFF;
-
-	return 0;
 }
 
 SystemState
@@ -151,4 +126,33 @@ interrupt
 void undefInstrHandler()
 {
 	// implement when necessary
+}
+
+uint32_t
+getSysMillisSysCall( void )
+{
+	uint64_t sysMillis = getSysMillis();
+
+	// NOTE: because sysMillis is a 64bit wide we need to distribute it over R0 and R1
+	currentUserCtx->regs[ 0 ] = sysMillis & 0xFFFFFFFF;
+	currentUserCtx->regs[ 1 ] = ( sysMillis >> 31 ) & 0xFFFFFFFF;
+
+	return 0;
+}
+
+
+uint32_t
+handleSystemTimerOverflow( UserContext* ctx )
+{
+	// NOTE: every SYSTIMER_OVERFLOW_INTERVAL_MS milliseconds the system-timer will
+	// overflow. The system-timer is driven by the TOCR register which is a 24-bit
+	// register so SYSTIMER_OVERFLOW_INTERVAL_MS will be most likely set to 0x00FFFFFF
+	// thus after 0x00FFFFFF ms an overflow will be generated which allows the
+	// global system-milliseconds to be incremented by SYSTIMER_OVERFLOW_INTERVAL_MS
+	// so it is possible to maintain a uint64_t systemmilliseconds value
+	systemMillis += SYSTIMER_OVERFLOW_INTERVAL_MS;
+
+	sysTimerResetInterrupt();
+
+	return 0;
 }

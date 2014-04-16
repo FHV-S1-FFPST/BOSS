@@ -61,28 +61,23 @@ SWI -> IRQ
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 */
 
-static uint32_t runningPID = 0;
-
 #define SCHEDULE_INTERVAL_MS		10
-
 #define USERMODE_WITHIRQ_CPSR		0x60000110
 
-// prototypes of this module
-Task* getNextReady();
-int32_t createTask( task_func entryPoint );
-uint32_t schedule( UserContext* ctx );			// IRQ callback prototype
-void initializeTask( Task* task, task_func entryPoint );
-
-int32_t
-idleTaskFunc( void* args )
-{
-	volatile uint32_t counter = 0;
-
-	while( 1 )
-	{
-		counter++;
-	}
-}
+// module-local data //////////////////////////////////////////////
+static uint32_t runningPID = 0;
+// module-local functions /////////////////////////////////////////
+static uint32_t schedule( UserContext* ctx );
+static uint32_t scheduleNextReady( UserContext* ctx );
+static Task* getNextReady();
+static void initializeTask( Task* task, task_func entryPoint );
+static int32_t idleTaskFunc( void* args );
+static void saveCtxToTask( UserContext* ctx, Task* task );
+static void restoreCtxFromTask( UserContext* ctx, Task* task );
+static uint32_t saveCurrentRunning( UserContext* ctx );
+static void allocateStackPointer( Task* task );
+static Task* createTaskInternal( task_func entryPoint );
+///////////////////////////////////////////////////////////////////
 
 uint32_t
 schedInit()
@@ -108,21 +103,77 @@ schedStart()
 	irqTimerStart();
 }
 
-void
-saveCtxToTask( UserContext* ctx, Task* task)
+
+int32_t
+createTask( task_func entryPoint )
 {
-	task->state = READY;
-	task->pc = ctx->pc;
-	task->cpsr = ctx->cpsr;
-	memcpy( task->reg, ctx->regs, sizeof( task->reg ) );
+	createTaskInternal( entryPoint );
+
+	return 0;
 }
 
-void
-restoreCtxFromTask( UserContext* ctx, Task* task )
+Task*
+createTaskInternal( task_func entryPoint )
 {
-	ctx->pc = task->pc;
-	ctx->cpsr = task->cpsr;
-	memcpy( ctx->regs, task->reg, sizeof( task->reg ) );
+	Task newTask;
+
+	initializeTask( &newTask, entryPoint );
+
+	allocateStackPointer( &newTask );
+
+	addTask( &newTask );
+
+	return getTask( newTask.pid );
+}
+
+// TODO: merge fork and create task into one and pull out specific stuff for fork
+int32_t
+fork()
+{
+	Task* newTask = createTaskInternal( ( task_func ) currentUserCtx->pc );
+
+	// the child process will receive the content of the registers of the parent process
+	memcpy( newTask->reg, currentUserCtx->regs, sizeof( newTask->reg ) );
+	// set register 0 of child-process to 0 to notify that the process is the child process
+	newTask->reg[ 0 ] = 0;
+
+	// fork will return 1 for caller which is the parent process
+	currentUserCtx->regs[ 0 ] = 1;
+
+	return 0;
+}
+
+int32_t
+sleep( uint32_t millis )
+{
+	saveCurrentRunning( currentUserCtx );
+	uint32_t systemMillis = getSysMillis();
+
+	Task* runningTask = getTask( runningPID );
+	runningTask->state = SLEEPING;
+	runningTask->sleepUntil = systemMillis + millis;
+
+	// TODO: problem: when new to schedule task has never run, the PC will point one instruction too far because createtask incremented it
+	// 		 it is ok when it already ran because the current instruction is interrupted by the IRQ and thus not executed and needs to be executed again
+
+	scheduleNextReady( currentUserCtx );
+
+	return 0;
+}
+
+// NOTE: this is a callback called by irq
+uint32_t
+schedule( UserContext* ctx )
+{
+	uint32_t ret = 0;
+
+	saveCurrentRunning( ctx );
+
+	ret = scheduleNextReady( ctx );
+
+	irqTimerResetCounterAndInterrupt();
+
+	return ret;
 }
 
 uint32_t
@@ -198,21 +249,6 @@ saveCurrentRunning( UserContext* ctx )
 	return 0;
 }
 
-// NOTE: this is a callback called by irq
-uint32_t
-schedule( UserContext* ctx )
-{
-	uint32_t ret = 0;
-
-	saveCurrentRunning( ctx );
-
-	ret = scheduleNextReady( ctx );
-
-	irqTimerResetCounterAndInterrupt();
-
-	return ret;
-}
-
 Task*
 getNextReady()
 {
@@ -262,6 +298,23 @@ getNextReady()
 }
 
 void
+saveCtxToTask( UserContext* ctx, Task* task)
+{
+	task->state = READY;
+	task->pc = ctx->pc;
+	task->cpsr = ctx->cpsr;
+	memcpy( task->reg, ctx->regs, sizeof( task->reg ) );
+}
+
+void
+restoreCtxFromTask( UserContext* ctx, Task* task )
+{
+	ctx->pc = task->pc;
+	ctx->cpsr = task->cpsr;
+	memcpy( ctx->regs, task->reg, sizeof( task->reg ) );
+}
+
+void
 allocateStackPointer( Task* task )
 {
 	// TODO: replace malloc by other facilitys when virtual memory and process creation is implemented
@@ -283,56 +336,12 @@ initializeTask( Task* task, task_func entryPoint )
 }
 
 int32_t
-createTask( task_func entryPoint )
+idleTaskFunc( void* args )
 {
-	Task newTask;
+	volatile uint32_t counter = 0;
 
-	initializeTask( &newTask, entryPoint );
-
-	allocateStackPointer( &newTask );
-
-	addTask( &newTask );
-
-	return 0;
-}
-
-// TODO: merge fork and create task into one and pull out specific stuff for fork
-int32_t
-fork()
-{
-	Task newTask;
-
-	initializeTask( &newTask, ( task_func ) currentUserCtx->pc );
-
-	allocateStackPointer( &newTask );
-
-	// the child process will receive the content of the registers of the parent process
-	memcpy( newTask.reg, currentUserCtx->regs, sizeof( newTask.reg ) );
-	// set register 0 of child-process to 0 to notify that the process is the child process
-	newTask.reg[ 0 ] = 0;
-
-	addTask( &newTask );
-
-	// fork will return 1 for caller which is the parent process
-	currentUserCtx->regs[ 0 ] = 1;
-
-	return 0;
-}
-
-int32_t
-sleep( uint32_t millis )
-{
-	saveCurrentRunning( currentUserCtx );
-	uint32_t systemMillis = getSysMillis();
-
-	Task* runningTask = getTask( runningPID );
-	runningTask->state = SLEEPING;
-	runningTask->sleepUntil = systemMillis + millis;
-
-	// TODO: problem: when new to schedule task has never run, the PC will point one instruction too far because createtask incremented it
-	// 		 it is ok when it already ran because the current instruction is interrupted by the IRQ and thus not executed and needs to be executed again
-
-	scheduleNextReady( currentUserCtx );
-
-	return 0;
+	while( 1 )
+	{
+		counter++;
+	}
 }

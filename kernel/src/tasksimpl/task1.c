@@ -4,56 +4,44 @@
  *  Created on: 05.03.2014
  *      Author: Thaler
  */
-#undef KERNEL
+#undef KERNEL	// NOTE: if not used sleep, fork and getSysMillis will call the sys-calls directly instead of causing a trap through SWI
 
 #include "task1.h"
 
 int32_t
 task1( void* args )
 {
-	volatile uint32_t counter = 0;
-
-	/*
 	if ( fork() )
 	{
+		// NOTE: at this point we are in the parent of fork
+
 		while( 1 )
 		{
-			counter++;
+			uint64_t startMillis = getSysMillis();
 
-			uint64_t sysMillis = getSysMillis();
+			sleep( 5000 );
 
-			sleep( 10000 );
+			uint64_t stopMillis = getSysMillis();
+			uint64_t deltaMillis = stopMillis - startMillis;
 
-			sysMillis = getSysMillis();
+			deltaMillis++;
 		}
 	}
 	else
 	{
+		// NOTE: at this point we are in the child of fork
+
 		while( 1 )
 		{
-			counter++;
-
-			uint64_t sysMillis = getSysMillis();
+			uint64_t startMillis = getSysMillis();
 
 			sleep( 10000 );
 
-			sysMillis = getSysMillis();
+			uint64_t stopMillis = getSysMillis();
+			uint64_t deltaMillis = stopMillis - startMillis;
+
+			deltaMillis++;
 		}
-	}
-	*/
-
-	while( 1 )
-	{
-		counter++;
-
-		uint64_t startMillis = getSysMillis();
-
-		sleep( 10000 );
-
-		uint64_t stopMillis = getSysMillis();
-		uint64_t deltaMillis = stopMillis - startMillis;
-
-		deltaMillis++;
 	}
 
 	// TODO: handle exit of processes: through manipulating LR?

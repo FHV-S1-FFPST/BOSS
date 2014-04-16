@@ -8,7 +8,7 @@
 #ifndef COMMON_H_
 #define COMMON_H_
 
-#include <boss.h>
+#include <inttypes.h>
 
 #define READ_REGISTER( addr ) (*(volatile uint32_t *)( addr ))
 #define READ_REGISTER_OFFSET( base, offset ) (*(volatile uint32_t *)((base)+(offset)))

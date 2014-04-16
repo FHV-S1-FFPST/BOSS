@@ -8,7 +8,7 @@
 #ifndef TIMER_HAL_H_
 #define TIMER_HAL_H_
 
-#include <boss.h>
+#include <inttypes.h>
 
 #define GPTIMER1_ADDR			0x48318000
 #define GPTIMER2_ADDR			0x49032000

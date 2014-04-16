@@ -17,6 +17,7 @@
 #define BIT_CLEAR( val, bits ) val &= ~bits
 #define BIT_KEEP( val, bits ) val &= bits
 #define BIT_CLEAR_ALL( val ) val = 0x0
+#define BIT_CHECK( val, bits ) val & bits
 
 #define AWAIT_BITS_SET( val, bits ) while ( ! ( val & bits ) ) {}
 #define AWAIT_BITS_CLEARED( val, bits ) while ( val & bits ) {}

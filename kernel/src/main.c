@@ -1,6 +1,7 @@
 #include "core/core.h"
 #include "scheduler/scheduler.h"
 #include "irq/irq.h"
+#include "fs/fat32/fat32.h"
 
 #include "tasksimpl/task1.h"
 
@@ -105,6 +106,10 @@ initDrivers( void )
 	// TODO: start keyboard-driver server
 	// TODO: start RS232-driver server
 	// TODO: start DMX-driver server
+	if( fat32Init() )
+	{
+		return 1;
+	}
 
 	return 0;
 }

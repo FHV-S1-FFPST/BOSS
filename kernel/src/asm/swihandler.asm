@@ -19,7 +19,7 @@ _swi_handler_asm:
 	BL		swiHandler				; jump AND link, otherwise stackpointer would not be restored
 
 	LDMFD	SP!, { R1 }				; restore SPSR, if changed by scheduler
-	MSR		SPSR_cxsf, R1			; set stored cpsr from user to the current CPSR - will be restored later during SUBS
+	MSR		SPSR_cxsf, R1			; set stored cpsr from user to the current CPSR - will be restored later during MOVS
 
 	LDMFD	SP!, { LR }				; restore LR, if changed by scheduler
 

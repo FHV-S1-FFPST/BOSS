@@ -54,23 +54,29 @@ typedef volatile struct UART_CONF *UART_CONF_t;
 volatile struct UART_CONF *com_port= (UART_CONF_t) UART3_BASE;
 
 static RETURN_CODE openSerial(Driver_t *self) {
-	int baud_divisor=312;
-
-	reg32w(UART3_BASE, MDR1_REG, 0x07);
-	reg32w(UART3_BASE, LCR_REG, 0x80|0x03);
-	reg32w(UART3_BASE, DLL_REG, (baud_divisor & 0xff));
-	reg32w(UART3_BASE, DLH_REF, (baud_divisor >> 8) & 0xff);
-	reg32w(UART3_BASE, LCR_REG, 0x03);
-	reg32w(UART3_BASE, MCR_REG, 0x01 | 0x02 );
-	reg32w(UART3_BASE, FCR_REG, 0x01 | 0x02 | 0x04);
 	reg32w(UART3_BASE, MDR1_REG, 0x0);
 
 	return SUCCESS;
 }
 
 static RETURN_CODE ioctlSerial(Driver_t *self, enum IOCTL_CMD cmd, void *data) {
+	int baud_rate;
+
 	switch(cmd) {
 	case SERIAL_SET_BAUD_RATE:
+		baud_rate = *((int *)data);
+
+
+        reg32w(UART3_BASE, MDR1_REG, 0x07);
+        reg32w(UART3_BASE, LCR_REG, 0x80|0x03);
+        reg32w(UART3_BASE, DLL_REG, (baud_rate & 0xff));
+        reg32w(UART3_BASE, DLH_REF, (baud_rate >> 8) & 0xff);
+        reg32w(UART3_BASE, LCR_REG, 0x03);
+        reg32w(UART3_BASE, MCR_REG, 0x01 | 0x02 );
+        reg32w(UART3_BASE, FCR_REG, 0x01 | 0x02 | 0x04);
+
+        reg32w(UART3_BASE, MDR1_REG, 0x0);
+
 		return SUCCESS;
 	default:
 		return FAILURE;

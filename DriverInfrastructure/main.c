@@ -9,6 +9,11 @@ int main (void) {
 	  return 1;
   }
 
+
+  //Set the baud-rate
+  int baud_rate = 312;
+  driverIoctl(SERIAL_DRIVER, SERIAL_SET_BAUD_RATE, &baud_rate);
+
   //Write a message out of the serial port
   char *message = "\r\nTACHO!\r\n\0";
   driverWrite(SERIAL_DRIVER, message);

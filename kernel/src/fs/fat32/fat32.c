@@ -29,8 +29,8 @@ fat32Init()
 
 	sdHalInit();
 
-	sdHalReadBytes( GLOBAL_BPS_STRUCT_OFFSET, &globalBps, sizeof( globalBps ) );
-	sdHalReadBytes( FAT32_BPS_STRUCT_OFFSET, &fat32Bps, sizeof( fat32Bps ) );
+	sdHalReadBytes( ( uint32_t* ) GLOBAL_BPS_STRUCT_OFFSET, ( uint32_t* ) &globalBps, sizeof( globalBps ) );
+	sdHalReadBytes( ( uint32_t* ) FAT32_BPS_STRUCT_OFFSET, ( uint32_t* ) &fat32Bps, sizeof( fat32Bps ) );
 
 	// TODO: inspect structs to ensure we are really fat32
 

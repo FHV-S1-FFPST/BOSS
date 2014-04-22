@@ -24,7 +24,7 @@ typedef enum
 	IRQ = 0x12,
 	SUPERVISOR = 0x13,
 	ABORT = 0x17,
-	SYSTEM = 0x1F,
+	SYSTEM = 0x1F
 } SystemState;
 
 UserContext* currentUserCtx;

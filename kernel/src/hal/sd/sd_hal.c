@@ -187,8 +187,8 @@ defaultInit( void )
 	// NOTE: see OMAP35x.pdf page 3178f
 
 	// NOTE: using magic numbers copied from manual because it would lead to contradicting values if following steps 1-6
-	BIT_SET( MMCHS_HCTL( SELECTED_CHS ), 0x00000b00 );
-	BIT_SET( MMCHS_SYSCTL( SELECTED_CHS ), 0x0000a007 );
+	MMCHS_HCTL( SELECTED_CHS ) = 0x00000b00;
+	MMCHS_SYSCTL( SELECTED_CHS ) = 0x0000a007;
 	MMCHS_CON( SELECTED_CHS ) = MMCHS_CON_OD_BIT;
 }
 
@@ -198,8 +198,8 @@ initProcedureStart( void )
 	// NOTE: see OMAP35x.pdf page 3179
 
 	BIT_SET( MMCHS_CON( SELECTED_CHS ), MMCHS_CON_INIT_BIT );
-	BIT_SET( MMCHS_CMD( SELECTED_CHS ), 0x0 );
-	BIT_SET( READ_REGISTER( CONTROL_PADCONF_MMC1_ADDR ), 0x100 );
+	MMCHS_CMD( SELECTED_CHS ) = 0x0;
+	READ_REGISTER( CONTROL_PADCONF_MMC1_ADDR ) = 0x100;
 }
 
 void
@@ -207,8 +207,8 @@ preCardIdentificationConfig( void )
 {
 	// NOTE: see OMAP35x.pdf page 3179
 
-	BIT_SET( MMCHS_HCTL( SELECTED_CHS ), 0x00000b00 );
-	BIT_SET( MMCHS_SYSCTL( SELECTED_CHS ), 0x00003C07 );
+	MMCHS_HCTL( SELECTED_CHS ) = 0x00000b00;
+	MMCHS_SYSCTL( SELECTED_CHS ) = 0x00003C07;
 	MMCHS_CON( SELECTED_CHS ) = MMCHS_CON_OD_BIT;
 }
 
@@ -294,7 +294,7 @@ identify( void )
 	BIT_SET( MMCHS_CON( SELECTED_CHS ), MMCHS_CON_INIT_BIT );
 	MMCHS_CMD( SELECTED_CHS ) = 0x0;
 
-	// WAIT 1ms
+	// WAIT 1ms to allow card initializing internal state
 	uint64_t sysMillis = getSysMillis();
 	while ( 1 > getSysMillis() - sysMillis ) { }
 
@@ -307,8 +307,10 @@ identify( void )
 
 	// TODO: Change clock frequency to fit protocol
 
+	// send GO_IDLE_STATE
 	sendCmd0();
 
+	// cmd5 is reserved for I/O cards: SDIO
 	sendCmd5();
 
 	if ( waitForStatCC() )
@@ -318,11 +320,12 @@ identify( void )
 
 	doAndAwaitSysCtlSrc();
 
+	// send SEND_IF_COND
 	sendCmd8();
 
 	if ( waitForStatCC() )
 	{
-		// TODO: it is an SD card compliant with standard 2.0 or later
+		// NOTE: it is an SD card compliant with standard 2.0 or later
 	}
 
 	doAndAwaitSysCtlSrc();
@@ -330,15 +333,23 @@ identify( void )
 	uint8_t cardBusyFlag = 0;
 	do
 	{
+		// send APP_CMD to notify card that next command will be application specific
 		sendCmd55();
 
+		// send SD_SEND_OP_COND
 		sendACmd41();
 
 		if ( waitForStatCC() )
 		{
-			// TODO: it is a SD card compliant with standard 1.x
+			// NOTE: it is a SD card compliant with standard 1.x
+
+			// only in this case we need to check if card is busy
 			cardBusyFlag = isCardBusy();
-			goto cardIdentified;
+			// if card is busy, repeat again, otherwise card is identified
+			if ( !cardBusyFlag )
+			{
+				goto cardIdentified;
+			}
 		}
 	} while ( cardBusyFlag );
 
@@ -352,18 +363,21 @@ identify( void )
 
 		if ( waitForStatCC() )
 		{
-			// TODO: unknown type of card
+			// TODO: handle unknown type of card
 		}
 
 	} while ( isCardBusy() );
 
 cardIdentified:
+	// send ALL_SEND_CID
 	sendCmd2();
 
+	// send SEND_RELATIVE_ADDR to ask card to publish new realtive address
 	sendCmd3();
 
 	// NOTE: assume if MMC card only one MMC card connected to bus
 
+	// send SELECT/DESELECT_CARD to select card
 	sendCmd7();
 }
 
@@ -400,19 +414,25 @@ waitForStatCC( void )
 	return 0;
 }
 
+/* NOTE: GO_IDLE_STATE
+ * Resets all cards to idle state
+ */
 void
 sendCmd0( void )
 {
 	// NOTE: this command resets the MMC card (see OMAP35x.pdf page 3180)
 
-	BIT_SET( MMCHS_CON( SELECTED_CHS ), 0x00000001 );
-	BIT_SET( MMCHS_IE( SELECTED_CHS ), 0x00040001 );
-	BIT_SET( MMCHS_ISE( SELECTED_CHS ), 0x00040001 );
-	BIT_SET( MMCHS_CMD( SELECTED_CHS ), 0x00000000 );
+	MMCHS_CON( SELECTED_CHS ) = 0x00000001;
+	MMCHS_IE( SELECTED_CHS ) = 0x00040001;
+	MMCHS_ISE( SELECTED_CHS ) = 0x00040001;
+	MMCHS_CMD( SELECTED_CHS ) = 0x00000000;
 
 	// NOTE: this command has no response
 }
 
+/* NOTE: reserved
+ * ?
+ */
 void
 sendCmd1( void )
 {
@@ -420,88 +440,126 @@ sendCmd1( void )
 	//			compare Card OCR and Host OCR, and then send a second CMD1 command with the cross-checked
 	//			OCR (see OMAP35x.pdf page 3181 )
 
-	BIT_SET( MMCHS_CON( SELECTED_CHS ), 0x00000001 );
-	BIT_SET( MMCHS_IE( SELECTED_CHS ), 0x00050001 );
-	BIT_SET( MMCHS_ISE( SELECTED_CHS ), 0x00050001 );
-	BIT_SET( MMCHS_CMD( SELECTED_CHS ), 0x01020000 );
+	MMCHS_CON( SELECTED_CHS ) = 0x00000001;
+	MMCHS_IE( SELECTED_CHS ) = 0x00050001;
+	MMCHS_ISE( SELECTED_CHS ) = 0x00050001;
+	MMCHS_CMD( SELECTED_CHS ) = 0x01020000;
 }
 
+/* NOTE: ALL_SEND_CID
+ * Asks any card to send the CID num-bers on the CMD line (any card that is connected to the host will respond)
+ */
 void
 sendCmd2( void )
 {
 	// NOTE: This command asks the MMC card to send its CID register's content (see OMAP35x.pdf page 3182)
 
-	BIT_SET( MMCHS_CON( SELECTED_CHS ), 0x00000001 );
-	BIT_SET( MMCHS_IE( SELECTED_CHS ), 0x00070001 );
-	BIT_SET( MMCHS_ISE( SELECTED_CHS ), 0x00070001 );
-	BIT_SET( MMCHS_CMD( SELECTED_CHS ), 0x02090000 );
+	MMCHS_CON( SELECTED_CHS ) = 0x00000001;
+	MMCHS_IE( SELECTED_CHS ) = 0x00070001;
+	MMCHS_ISE( SELECTED_CHS ) = 0x00070001;
+	MMCHS_CMD( SELECTED_CHS ) = 0x02090000;
 
 	// NOTE: The response is 128 bits wide and is received in MMCHS1.MMCHS_RSP10, MMCHS1.MMCHS_RSP32, MMCHS1.MMCHS_RSP54 and MMCHS1.MMCHS_RSP76 registers.
 }
 
+/* NOTE: SEND_RELATIVE_ADDR
+ * Ask the card to publish a new relative address (RCA)
+ */
 void
 sendCmd3( void )
 {
 	// NOTE: This command sets MMC card address (see Table 22-19). Useful when MMCHS controller switches to addressed mode (see OMAP35x.pdf page 3182)
 
-	BIT_SET( MMCHS_CON( SELECTED_CHS ), 0x00000001 );
-	BIT_SET( MMCHS_IE( SELECTED_CHS ), 0x100f0001 );
-	BIT_SET( MMCHS_ISE( SELECTED_CHS ), 0x100f0001 );
-	BIT_SET( MMCHS_CMD( SELECTED_CHS ), 0x031a0000 );
-	BIT_SET( MMCHS_ARG( SELECTED_CHS ), 0x00010000 );
+	MMCHS_CON( SELECTED_CHS ) = 0x00000001;
+	MMCHS_IE( SELECTED_CHS ) = 0x100f0001;
+	MMCHS_ISE( SELECTED_CHS ) = 0x100f0001;
+	MMCHS_ARG( SELECTED_CHS ) = 0x00010000;
+	MMCHS_CMD( SELECTED_CHS ) = 0x031a0000;
 }
 
+// NOTE: reserved for I/O cards (refer to the "SDIO Card Specification")
 void
 sendCmd5( void )
 {
 	// NOTE: This command asks a SDIO card to send its operating conditions. This command will fail if there is no SDIO card (see OMAP35x.pdf page 3180)
 
-	BIT_SET( MMCHS_CON( SELECTED_CHS ), 0x00000001 );
-	BIT_SET( MMCHS_IE( SELECTED_CHS ), 0x00050001 );
-	BIT_SET( MMCHS_ISE( SELECTED_CHS ), 0x00050001 );
-	BIT_SET( MMCHS_CMD( SELECTED_CHS ), 0x05020000 );
+	MMCHS_CON( SELECTED_CHS ) = 0x00000001;
+	MMCHS_IE( SELECTED_CHS ) = 0x00050001;
+	MMCHS_ISE( SELECTED_CHS ) = 0x00050001;
+	MMCHS_CMD( SELECTED_CHS ) = 0x05020000;
 
 	// NOTE: In case of success the response will be in MMCHS1.MMCHS_RSP10 register
 }
 
+/* NOTE: SELECT/DESELECT_CARD
+ * ommand toggles a card between the stand-by and transfer states or between the programming and disconnect states.
+ * In both cases, the card is selected by its own relative address and gets deselected by any other address; address 0 deselects all.
+ * In the case that the RCA equals 0, then the host may do one of the following:
+ * 		- Use other RCA number to perform card de-selection.
+ * 		- Re-send CMD3 to change its RCA number to other than 0 and then use CMD7 with RCA=0 for card de- selection.
+ */
 void
 sendCmd7( void )
 {
 	// NOTE: see OMAP35x.pdf page 3184
 
-	BIT_SET( MMCHS_CON( SELECTED_CHS ), 0x00000000 );
-	BIT_SET( MMCHS_IE( SELECTED_CHS ), 0x100f0001 );
-	BIT_SET( MMCHS_ISE( SELECTED_CHS ), 0x100f0001 );
-	BIT_SET( MMCHS_CMD( SELECTED_CHS ), 0x071a0000 );
-	BIT_SET( MMCHS_ARG( SELECTED_CHS ), 0x00010000 );
+	MMCHS_CON( SELECTED_CHS ) = 0x00000000;
+	MMCHS_IE( SELECTED_CHS ) = 0x100f0001;
+	MMCHS_ISE( SELECTED_CHS ) = 0x100f0001;
+	MMCHS_ARG( SELECTED_CHS ) = 0x00010000;
+	MMCHS_CMD( SELECTED_CHS ) = 0x071a0000;
 }
 
+/* NOTE: SEND_IF_COND
+ * Sends SD Memory Card interface condition, which includes host supply voltage information and asks the card whether card supports voltage.
+ * Reserved bits shall be set to '0'.
+ */
 void
 sendCmd8( void )
 {
 	// NOTE: This command asks a SD card version 2.X to send its operating conditions (see OMAP35x.pdf page 3180f)
 
-	BIT_SET( MMCHS_CON( SELECTED_CHS ), 0x00000001 );
-	BIT_SET( MMCHS_IE( SELECTED_CHS ), 0x100f0001 );
-	BIT_SET( MMCHS_ISE( SELECTED_CHS ), 0x100f0001 );
-	BIT_SET( MMCHS_CMD( SELECTED_CHS ), 0x81a0000 );
+	MMCHS_CON( SELECTED_CHS ) = 0x00000001;
+	MMCHS_IE( SELECTED_CHS ) = 0x100f0001;
+	MMCHS_ISE( SELECTED_CHS ) = 0x100f0001;
+	MMCHS_CMD( SELECTED_CHS ) = 0x81a0000;
 
 	// NOTE: In case of success the response will be in MMCHS1.MMCHS_RSP10 register
 }
 
+/* NOTE: SD_SEND_OP_COND
+ * Sends host capacity support information (HCS) and asks the accessed card to send its operating condition register (OCR) content in the response on the CMD line.
+ * HCS is effective when card receives SEND_IF_COND command. Sends request to switch to 1.8V signaling (S18R).
+ * Reserved bit shall be set to '0'. CCS bit is assigned to OCR[30].
+ * XPC controls the maximum power in the default speed mode of SDXC card.
+ * XPC=0 means 0.36W (100mA at 3.6V on VDD1) (max.) but speed class is not supported.
+ * XPC=1 means 0.54W (150mA at 3.6V on VDD1) (max.) and speed class is supported.
+ */
 void
 sendACmd41( void )
 {
 	// TODO: implement
+
+	MMCHS_CON( SELECTED_CHS ) = 0x00000001;
+
+	MMCHS_IE( SELECTED_CHS ) = 0x100f0001; // TODO: implement
+	MMCHS_ISE( SELECTED_CHS ) = 0x100f0001; // TODO: implement
+
+	MMCHS_ARG( SELECTED_CHS ) = 0x00010000; // TODO: implement
+
+	MMCHS_CMD( SELECTED_CHS ) = 0x81a0000; // TODO: implement
 }
 
+/* NOTE: APP_CMD
+ * Indicates to the card that the next command is an application specific command rather than a standard command
+ */
 void
 sendCmd55( void )
 {
 	// This is a special command used to prevent the card that the following command is going to be an application one (see OMAP35x.pdf page 3181)
 
-	BIT_SET( MMCHS_CON( SELECTED_CHS ), 0x00000001 );
-	BIT_SET( MMCHS_IE( SELECTED_CHS ), 0x100f0001 );
-	BIT_SET( MMCHS_ISE( SELECTED_CHS ), 0x100f0001 );
-	BIT_SET( MMCHS_CMD( SELECTED_CHS ), 0x371a0000 );
+	MMCHS_CON( SELECTED_CHS ) = 0x00000001;
+	MMCHS_IE( SELECTED_CHS ) = 0x100f0001;
+	MMCHS_ISE( SELECTED_CHS ) = 0x100f0001;
+	MMCHS_CMD( SELECTED_CHS ) = 0x371a0000;
 }

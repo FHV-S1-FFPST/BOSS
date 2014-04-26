@@ -10,6 +10,8 @@
 #include "../../common/common.h"
 #include "../../core/core.h"
 
+#include <string.h>
+
 // module-local data //////////////////////////////////////////////
 // module-local functions /////////////////////////////////////////
 // INITIALZATION & IDENTIFICATION
@@ -29,7 +31,6 @@ static uint32_t sendCommand( uint8_t cmdId, uint32_t arg );
 //static void configControllerBus( void );
 
 // HELPERS
-static uint8_t waitForStatCC( void );
 static uint32_t isCardBusy( void );
 static void awaitDataLineAvailable( void );
 static void awaitBufferReadReady( void );
@@ -38,6 +39,7 @@ static void resetMMCIDataLine( void );
 static void resetMMCICmdLine( void );
 static void awaitCommandLineAvailable( void );
 static uint32_t awaitCommandResponse( void );
+static void changeClockFrequency( uint16_t divider );
 
 // COMMANDS USED DURING INITIALZATION & IDENTIFICATION
 static uint32_t sendCmd0( void );
@@ -47,6 +49,7 @@ static uint32_t sendCmd3( void );
 static uint32_t sendCmd5( void );
 static uint32_t sendCmd7( void );
 static uint32_t sendCmd8( void );
+static uint32_t sendCmd9( void );
 static uint32_t sendCmd16( void );
 static uint32_t sendCmd18( uint32_t addr );
 static uint32_t sendCmd23( void );
@@ -166,6 +169,8 @@ static uint32_t sendACmd41( void );
 #define CM_EN_MMCHS1_BIT			0x1000000
 /////////////////////////////////////////////////////////////////////////////////////////////
 
+// NOTE: internal buffer consists of 2x512 blocks and allows ping pong reading/writing => two transfers
+// at the same time if one requests only blocks LE 512 => hardcode block-size to 512
 #define BLOCK_LEN 		512
 
 // TODO: remove after test
@@ -338,10 +343,28 @@ configControllerBus( void )
 }
 */
 
+void
+changeClockFrequency( uint16_t divider )
+{
+	// NOTE: see OMAP35x.pdf page 3174
+
+	// don't provide clock to the card
+	BIT_CLEAR( MMCHS_SYSCTL( SELECTED_CHS ), MMCHS_SYSCTL_CEN_BIT );
+
+	// write new clock divider value
+	MMCHS_SYSCTL( SELECTED_CHS ) = divider << 15;
+	// await Internal clock stable
+	AWAIT_BITS_SET( MMCHS_SYSCTL( SELECTED_CHS ), MMCHS_SYSCTL_ICS_BIT );
+
+	// provide clock to the card
+	BIT_CLEAR( MMCHS_SYSCTL( SELECTED_CHS ), MMCHS_SYSCTL_CEN_BIT );
+}
+
+// TODO: see OMAP35x.pdf 3141  Relation Between Configuration and Name of Response Type
+
 uint32_t
 identify( void )
 {
-	uint8_t cardBusyFlag = 0;
 	// NOTE: see OMAP35x.pdf page 3164
 
 	// start send initialization stream
@@ -359,7 +382,8 @@ identify( void )
 	// Clear MMCHS_STAT register
 	MMCHS_STAT( SELECTED_CHS ) = 0xFFFFFFFF;
 
-	// TODO: Change clock frequency to fit protocol
+	// NOTE: Change clock frequency to fit protocol
+	changeClockFrequency( 1 );
 
 	// send GO_IDLE_STATE
 	if ( sendCmd0() )
@@ -382,7 +406,7 @@ identify( void )
 		goto cardIdentified;
 	}
 
-	do
+	while ( 1 )
 	{
 		// send APP_CMD to notify card that next command will be application specific
 		if ( sendCmd55() )
@@ -396,20 +420,23 @@ identify( void )
 		{
 			// NOTE: it is a SD card compliant with standard 1.x
 
-			// only in this case we need to check if card is busy
-			cardBusyFlag = isCardBusy();
 			// if card is busy, repeat again, otherwise card is identified
-			if ( !cardBusyFlag )
+			if ( ! isCardBusy() )
 			{
 				goto cardIdentified;
 			}
 		}
-	} while ( cardBusyFlag );
+		else
+		{
+			break;
+		}
+	}
 
 	// NOTE: at this point we are a MMC card
 
 	do
 	{
+		// TODO: With OCR 0. In case of a CMD1 with OCR=0, a second CMD1 must be sent to the card with the "negociated" voltage.
 		if ( sendCmd1() )
 		{
 			// TODO: handle unknown type of card
@@ -430,6 +457,15 @@ cardIdentified:
 	{
 		return 1;
 	}
+
+	/* NOTE: After CMD3 command transfer is completed successfully, an auto-negotiation on voltage value an start.
+	 * This is the frontier when the MMCHS controller should switch from identification mode to transfer mode.
+	 * This impacts the controller in a way that it should change its bus state from open drain to push-pull.
+	 * Table 22-20 gives several registers and their values.
+	*/
+	MMCHS_CON( SELECTED_CHS ) = 0x0; // Bus is now in push-pull mode.
+	MMCHS_HCTL( SELECTED_CHS ) = 0x00000B00; // Bus power is on, 1.8 V is selected.
+	MMCHS_SYSCTL( SELECTED_CHS ) = 0x00003C07; // MMCHS controller's internal clock is stable and enabled, MMC card's clock is on. Divider value is 240 which means that MMCHS controller is still supplying a 400 KHz clock.
 
 	// NOTE: assume if MMC card only one MMC card connected to bus
 
@@ -474,10 +510,16 @@ readBlock( uint32_t addr, uint8_t* buffer )
 
 	do
 	{
+		// TODO: CHECK: page 3154: A read access to the MMCi.MMCHS_DATA register is allowed only when the buffer read enable status is
+		// set to 1 (MMCi.MMCHS_PSTATE[11] BRE); otherwise, a bad access (MMCi.MMCHS_STAT[29] BADA) is
+		// signaled.
+
 		awaitBufferReadReady();
 
 		// NOTE: read 4bytes of data from data-address, will be moved by controller automatically
 		uint32_t data = MMCHS_DATA( SELECTED_CHS );
+
+		// TODO: CHECK: page 3156 MMCi.MMCHS_STAT[29] BADA: Bad access to data space
 
 		buffer[ readTimes * 4 + 0 ] = 0xFF & ( data >> 0 );
 		buffer[ readTimes * 4 + 1 ] = 0xFF & ( data >> 8 );
@@ -486,18 +528,28 @@ readBlock( uint32_t addr, uint8_t* buffer )
 
 	} while ( --readTimes );
 
+	// TODO: if Auto CMD12 is enabled (MMCi.MMCHS_CMD[2] ACEN bit to 0x1) then nothing has to be done, otherwise CMD12 needs to be sent now
+
 checkTransferComplete:
+	// NOTE: for dependencies between error flags and transfer complete in MMCHS_STAT see page 3157
 	if ( isTransferComplete() )
 	{
 		// TODO: need to distinguish between finite and infinite transfer
 		// TODO: when finite: END
+
+		// NOTE: TC is set upon DEB & DCRC => need to check anyway for those errors if transfer has completed
+		if ( BIT_CHECK( MMCHS_STAT( SELECTED_CHS ), MMCHS_STAT_DEB_BIT ) ||
+				BIT_CHECK( MMCHS_STAT( SELECTED_CHS ), MMCHS_STAT_DCRC_BIT ) )
+		{
+			// finished with an error
+			resetMMCIDataLine();
+			return 1;
+		}
 	}
 	else
 	{
-		// check for Data End Bit error, Data CRC Error or Data timeout error
-		if ( BIT_CHECK( MMCHS_STAT( SELECTED_CHS ), MMCHS_STAT_DEB_BIT ) ||
-				BIT_CHECK( MMCHS_STAT( SELECTED_CHS ), MMCHS_STAT_DCRC_BIT ) ||
-				BIT_CHECK( MMCHS_STAT( SELECTED_CHS ), MMCHS_STAT_DTO_BIT ) )
+		// NOTE: DTO and TC are mutually exclusive, DCRC & DEB cannot occur with DTO
+		if ( BIT_CHECK( MMCHS_STAT( SELECTED_CHS ), MMCHS_STAT_DTO_BIT ) )
 		{
 			// finished with an error
 			resetMMCIDataLine();
@@ -505,7 +557,7 @@ checkTransferComplete:
 		}
 		else
 		{
-			// no error occured -> check again if transfer complete
+			// no error occured and transfer not yet completed -> check again if transfer complete
 			goto checkTransferComplete;
 		}
 	}
@@ -515,24 +567,90 @@ checkTransferComplete:
 }
 
 uint32_t
-sendReadCommand( uint8_t cmdId, uint32_t arg )
+awaitCommandResponse()
 {
-	// TODO: implement
-	return 0;
-}
+	// TODO: 22.3.2.2.1 Interrupt-Driven Operation and Polling page 3150, need to clear flags?
+	// try the same as in init procedure:
+	/*
+	// clear status: Command complete
+	BIT_SET( MMCHS_STAT( SELECTED_CHS ), MMCHS_STAT_CC_BIT );
+	// Clear MMCHS_STAT register
+	MMCHS_STAT( SELECTED_CHS ) = 0xFFFFFFFF;
+	*/
 
-uint32_t
-sendCommandNoResponse( uint8_t cmdId, uint32_t arg )
-{
-	// TODO: implement
-	return 0;
-}
+	// NOTE: for dependencies between error flags and command complete in MMCHS_STAT see page 3157f
 
-uint32_t
-sendCommandWithResponse( uint8_t cmdId, uint32_t arg )
-{
-	// TODO: implement
-	return 0;
+	while ( 1 )
+	{
+
+		volatile uint32_t stat = MMCHS_STAT( SELECTED_CHS );
+		volatile uint32_t cto = stat & MMCHS_STAT_CTO_BIT;
+		volatile uint32_t ccrc = stat & MMCHS_STAT_CCRC_BIT;
+		volatile uint32_t cc = stat & MMCHS_STAT_CC_BIT;
+
+		volatile uint32_t cmdTimeout = BIT_CHECK( MMCHS_STAT( SELECTED_CHS ), MMCHS_STAT_CTO_BIT );
+		volatile uint32_t cmdCrcError = BIT_CHECK( MMCHS_STAT( SELECTED_CHS ), MMCHS_STAT_CCRC_BIT );
+		volatile uint32_t cmdComplete = BIT_CHECK( MMCHS_STAT( SELECTED_CHS ), MMCHS_STAT_CC_BIT );
+
+		// NOTE: CTO can occur at the same time as CCRC: it indicates a command abort due to a contention on CMD line. In thiscase no CC appears.
+		if ( cmdTimeout && cmdCrcError )
+		{
+			// always need to reset CMD line after error
+			resetMMCICmdLine();
+			// return 1 to indicate failure
+			return 1;
+		}
+		// NOTE: CTO only occured, is mutually exclusive with CC and the errors CIE, CEB and CERR cannot occur with CTO.
+		else if ( cmdTimeout && 0 == cmdCrcError )
+		{
+			// always need to reset CMD line after error
+			resetMMCICmdLine();
+			// return 1 to indicate failure
+			return 1;
+		}
+		// command complete
+		else if ( cmdComplete )
+		{
+			// NOTE: CC is set upon CIE, CEB, CCRC (if no CTO) and CERR => need to check for those errors anyway although command has completed
+			if ( BIT_CHECK( MMCHS_STAT( SELECTED_CHS ), MMCHS_STAT_CIE_BIT ) ||
+					BIT_CHECK( MMCHS_STAT( SELECTED_CHS ), MMCHS_STAT_CEB_BIT ) ||
+					BIT_CHECK( MMCHS_STAT( SELECTED_CHS ), MMCHS_STAT_CCRC_BIT ) ||
+					BIT_CHECK( MMCHS_STAT( SELECTED_CHS ), MMCHS_STAT_CERR_BIT ) )
+			{
+				// Command index error / Command end bit error / Command CRC Error /  Card error ?
+				// return 1 to indicate failure
+				return 1;
+			}
+
+			// check if a response is waiting
+			if ( BIT_CHECK( MMCHS_CMD( SELECTED_CHS ), MMCHS_CMD_RSP_TYPE_48BUSY_BIT ) )
+			{
+				// a response is waiting
+
+				// NOTE: kind of responses OMAP35x.pdf 3157
+				// R1, R1b (normal response), R3, R4, RESP[39:8](1) MMCHS_RSP10[31:0]R5, R5b, R6
+				// R1b (Auto CMD12 response) RESP[39:8](1) MMCHS_RSP76[31:0]
+				// R2 RESP[127:0](1): MMCHS_RSP76, MMCHS_RSP54, MMCHS_RSP32, MMCHS_RSP10 (all bits)
+
+				uint32_t rsp0 = MMCHS_RSP10( SELECTED_CHS ) & 0x0000FFFF;
+				uint32_t rsp1 = MMCHS_RSP10( SELECTED_CHS ) >> 16;
+				uint32_t rsp2 = MMCHS_RSP32( SELECTED_CHS ) & 0x0000FFFF;
+				uint32_t rsp3 = MMCHS_RSP32( SELECTED_CHS ) >> 16;
+				uint32_t rsp4 = MMCHS_RSP54( SELECTED_CHS ) & 0x0000FFFF;
+				uint32_t rsp5 = MMCHS_RSP54( SELECTED_CHS ) >> 16;
+				uint32_t rsp6 = MMCHS_RSP76( SELECTED_CHS ) & 0x0000FFFF;
+				uint32_t rsp7 = MMCHS_RSP76( SELECTED_CHS ) >> 16;
+
+				// TODO: handle responses
+			}
+
+			return 0;
+		}
+		else
+		{
+			// not yet completed, check again
+		}
+	}
 }
 
 uint32_t
@@ -585,7 +703,7 @@ sendCommand( uint8_t cmdId, uint32_t arg )
 	BIT_SET( cmdToken, MMCHS_CMD_DDIR_BIT );
 
 	// TODO: enable auto-command 12: controller will automatically send CMD12 (STOP_TRANSMISSION) after transfer of last block is completed
-	BIT_SET( cmdToken, MMCHS_CMD_DDIR_BIT );
+	BIT_SET( cmdToken, MMCHS_CMD_ACEN_BIT );
 
 	// TODO: enable block count for multiple block transfers
 	BIT_SET( cmdToken, MMCHS_CMD_BCE_BIT );
@@ -607,79 +725,6 @@ sendCommand( uint8_t cmdId, uint32_t arg )
 	MMCHS_CMD( SELECTED_CHS ) = cmdToken;
 
 	return awaitCommandResponse();
-}
-
-uint32_t
-awaitCommandResponse()
-{
-	while ( 1 )
-	{
-		//
-		volatile uint32_t stat = MMCHS_STAT( SELECTED_CHS );
-		volatile uint32_t cto = stat & MMCHS_STAT_CTO_BIT;
-		volatile uint32_t ccrc = stat & MMCHS_STAT_CCRC_BIT;
-		volatile uint32_t cc = stat & MMCHS_STAT_CC_BIT;
-
-		volatile uint32_t cmdTimeout = BIT_CHECK( MMCHS_STAT( SELECTED_CHS ), MMCHS_STAT_CTO_BIT );
-		volatile uint32_t cmdCrcError = BIT_CHECK( MMCHS_STAT( SELECTED_CHS ), MMCHS_STAT_CCRC_BIT );
-		volatile uint32_t cmdComplete = BIT_CHECK( MMCHS_STAT( SELECTED_CHS ), MMCHS_STAT_CC_BIT );
-
-		// check for errors
-		if ( cmdTimeout && cmdCrcError )
-		{
-			// Command Timeout Error AND Command CRC Error occured
-			// NOTE: This is a particular case that occurs when there is a conflict on the mmci_cmd line
-
-			resetMMCICmdLine();
-			// return 1 to indicate failure
-			return 1;
-		}
-		// check for errors
-		else if ( cmdTimeout && 0 == cmdCrcError )
-		{
-			// Command Timeout Error but no Command CRC Error occured
-			resetMMCICmdLine();
-			// return 1 to indicate failure
-			return 1;
-		}
-		// command complete?
-		else if ( cmdComplete )
-		{
-			// yes command is complete
-
-			// check if a response is waiting
-			if ( BIT_CHECK( MMCHS_CMD( SELECTED_CHS ), MMCHS_CMD_RSP_TYPE_48BUSY_BIT ) )
-			{
-				// a response is waiting
-
-				uint32_t rsp0 = MMCHS_RSP10( SELECTED_CHS ) & 0x0000FFFF;
-				uint32_t rsp1 = MMCHS_RSP10( SELECTED_CHS ) >> 16;
-				uint32_t rsp2 = MMCHS_RSP32( SELECTED_CHS ) & 0x0000FFFF;
-				uint32_t rsp3 = MMCHS_RSP32( SELECTED_CHS ) >> 16;
-				uint32_t rsp4 = MMCHS_RSP54( SELECTED_CHS ) & 0x0000FFFF;
-				uint32_t rsp5 = MMCHS_RSP54( SELECTED_CHS ) >> 16;
-				uint32_t rsp6 = MMCHS_RSP76( SELECTED_CHS ) & 0x0000FFFF;
-				uint32_t rsp7 = MMCHS_RSP76( SELECTED_CHS ) >> 16;
-
-				// check for errors
-				if ( BIT_CHECK( MMCHS_STAT( SELECTED_CHS ), MMCHS_STAT_CIE_BIT ) ||
-						BIT_CHECK( MMCHS_STAT( SELECTED_CHS ), MMCHS_STAT_CEB_BIT ) ||
-						BIT_CHECK( MMCHS_STAT( SELECTED_CHS ), MMCHS_STAT_CCRC_BIT ) ||
-						BIT_CHECK( MMCHS_STAT( SELECTED_CHS ), MMCHS_STAT_CERR_BIT ) )
-				{
-					// Command index error / Command end bit error / Command CRC Error /  Card error ?
-					// return 1 to indicate failure
-					return 1;
-				}
-			}
-
-			return 0;
-		}
-		else
-		{
-			// not yet completed, check again
-		}
-	}
 }
 
 void
@@ -738,7 +783,7 @@ sendCmd0( void )
 
 	MMCHS_CON( SELECTED_CHS ) = 0x00000001;
 	MMCHS_IE( SELECTED_CHS ) = 0x00040001;
-	MMCHS_ISE( SELECTED_CHS ) = 0x00040001;
+	// NOTE: not interrupt-driven, polling for events MMCHS_ISE( SELECTED_CHS ) = 0x00040001;
 	MMCHS_CMD( SELECTED_CHS ) = 0x00000000;
 
 	return awaitCommandResponse();
@@ -750,13 +795,14 @@ sendCmd0( void )
 uint32_t
 sendCmd1( void )
 {
+	// TODO: implement NOTE, see spec for details
 	// NOTE: Once the card response is available in register MMCHS1.MMCHS_RSP10, the software is responsible to
 	//			compare Card OCR and Host OCR, and then send a second CMD1 command with the cross-checked
 	//			OCR (see OMAP35x.pdf page 3181 )
 
 	MMCHS_CON( SELECTED_CHS ) = 0x00000001;
 	MMCHS_IE( SELECTED_CHS ) = 0x00050001;
-	MMCHS_ISE( SELECTED_CHS ) = 0x00050001;
+	// NOTE: not interrupt-driven, polling for events MMCHS_ISE( SELECTED_CHS ) = 0x00050001;
 	MMCHS_CMD( SELECTED_CHS ) = 0x01020000;
 
 	return awaitCommandResponse();
@@ -772,12 +818,12 @@ sendCmd2( void )
 
 	MMCHS_CON( SELECTED_CHS ) = 0x00000001;
 	MMCHS_IE( SELECTED_CHS ) = 0x00070001;
-	MMCHS_ISE( SELECTED_CHS ) = 0x00070001;
+	// NOTE: not interrupt-driven, polling for events MMCHS_ISE( SELECTED_CHS ) = 0x00070001;
 	MMCHS_CMD( SELECTED_CHS ) = 0x02090000;
 
 	return awaitCommandResponse();
 
-	// NOTE: The response is 128 bits wide and is received in MMCHS1.MMCHS_RSP10, MMCHS1.MMCHS_RSP32, MMCHS1.MMCHS_RSP54 and MMCHS1.MMCHS_RSP76 registers.
+	// NOTE: The response is a R2 response => 128 bits wide and is received in MMCHS1.MMCHS_RSP10, MMCHS1.MMCHS_RSP32, MMCHS1.MMCHS_RSP54 and MMCHS1.MMCHS_RSP76 registers.
 }
 
 /* NOTE: SEND_RELATIVE_ADDR
@@ -790,8 +836,8 @@ sendCmd3( void )
 
 	MMCHS_CON( SELECTED_CHS ) = 0x00000001;
 	MMCHS_IE( SELECTED_CHS ) = 0x100f0001;
-	MMCHS_ISE( SELECTED_CHS ) = 0x100f0001;
-	MMCHS_ARG( SELECTED_CHS ) = 0x00010000;
+	// NOTE: not interrupt-driven, polling for events MMCHS_ISE( SELECTED_CHS ) = 0x100f0001;
+	MMCHS_ARG( SELECTED_CHS ) = 0x00010000; // the MMC cards address
 	MMCHS_CMD( SELECTED_CHS ) = 0x031a0000;
 
 	return awaitCommandResponse();
@@ -805,12 +851,41 @@ sendCmd5( void )
 
 	MMCHS_CON( SELECTED_CHS ) = 0x00000001;
 	MMCHS_IE( SELECTED_CHS ) = 0x00050001;
-	MMCHS_ISE( SELECTED_CHS ) = 0x00050001;
+	// NOTE: not interrupt-driven, polling for events MMCHS_ISE( SELECTED_CHS ) = 0x00050001;
 	MMCHS_CMD( SELECTED_CHS ) = 0x05020000;
 
 	return awaitCommandResponse();
 
 	// NOTE: In case of success the response will be in MMCHS1.MMCHS_RSP10 register
+}
+
+// TODO: use it
+uint32_t
+sendCmd6( void )
+{
+	// NOTE: Setting Data Bus Width to 8
+
+	MMCHS_CON( SELECTED_CHS ) = 0x00000000;
+	MMCHS_IE( SELECTED_CHS ) = 0x100f0001;
+	// NOTE: not interrupt-driven, polling for events MMCHS_ISE( SELECTED_CHS ) = 0x100f0001;
+	MMCHS_ARG( SELECTED_CHS ) = 0x03b70200; // (3 << 24) | (byte_address << 16) | (byte_value << 8). byte_address is the byte address in ext_csd register.
+	MMCHS_CMD( SELECTED_CHS ) = 0x061b0000;
+
+	/*
+	After issuing CMD6 completes successfully and MMC card leaves busy state, MMCHS controller should
+	change its data bus width. This is done by changing MMCHS1.MMCHS_CON configuration value.
+*/
+	MMCHS_CON( SELECTED_CHS ) = 0x00000020; // TODO: wont it be overwritten?
+
+	/*
+	 * After issuing CMD6 completes successfully and MMC card leaves busy state, MMCHS controller should
+now change its output clock to bring it to 48 MHz. 52 MHz, max frequency value supported by MMC card
+version 4 and above, is not supported because 96 MHz, MMCHS controller functional clock, is not a
+multiple of 52 MHz. We fall off to 48 MHz.
+	 */
+	MMCHS_SYSCTL( SELECTED_CHS ) = 0x00000087; // MMCHS controller's internal clock is stable and enabled, MMC card's clock is on. Divider value is 2 which means that MMCHS controller is supplying a 48 MHz clock.
+
+	return awaitCommandResponse();
 }
 
 /* NOTE: SELECT/DESELECT_CARD
@@ -827,9 +902,15 @@ sendCmd7( void )
 
 	MMCHS_CON( SELECTED_CHS ) = 0x00000000;
 	MMCHS_IE( SELECTED_CHS ) = 0x100f0001;
-	MMCHS_ISE( SELECTED_CHS ) = 0x100f0001;
-	MMCHS_ARG( SELECTED_CHS ) = 0x00010000;
+	// NOTE: not interrupt-driven, polling for events MMCHS_ISE( SELECTED_CHS ) = 0x100f0001;
+	MMCHS_ARG( SELECTED_CHS ) = 0x00010000; // address of the card
 	MMCHS_CMD( SELECTED_CHS ) = 0x071a0000;
+
+	/* TODO: After a CMD7 transfer is complete, the MMC card is ready to receive a CMD6 command. CMD6 command
+is used to write a byte in MMC card extended CSD register (ext_csd). It is an IO access function. There
+are two write actions, the first one enables a specific data bus width in the card. For our use case we used
+maximum data bus width 8. The second one enables high speed feature in the card.
+	*/
 
 	return awaitCommandResponse();
 }
@@ -845,12 +926,49 @@ sendCmd8( void )
 
 	MMCHS_CON( SELECTED_CHS ) = 0x00000001;
 	MMCHS_IE( SELECTED_CHS ) = 0x100f0001;
-	MMCHS_ISE( SELECTED_CHS ) = 0x100f0001;
+	// NOTE: not interrupt-driven, polling for events MMCHS_ISE( SELECTED_CHS ) = 0x100f0001;
 	MMCHS_CMD( SELECTED_CHS ) = 0x81a0000;
 
 	return awaitCommandResponse();
 	// NOTE: In case of success the response will be in MMCHS1.MMCHS_RSP10 register
 }
+
+// TODO: document AND USE IT
+uint32_t
+sendCmd9( void )
+{
+	// NOTE: This command asks the card to send its csd register's content
+
+	MMCHS_CON( SELECTED_CHS ) = 0x00000000;
+	MMCHS_IE( SELECTED_CHS ) = 0x00070001;
+	// NOTE: not interrupt-driven, polling for events MMCHS_ISE( SELECTED_CHS ) = 0x00070001;
+	MMCHS_ARG( SELECTED_CHS ) = 0x00010000;	// address of the card
+	MMCHS_CMD( SELECTED_CHS ) = 0x09090000;
+
+	// TODO: handle
+	/*
+	After receiving and parsing CMD9 response, MMC card clock speed must change to take advantage to
+	card's maximum speed. This has an impact on MMC bus as we should perform a clock frequency change.
+	At this stage the maximum clock frequency will be 20 MHz (please refer to MMC system specification from
+	www.mmca.org).
+	Clock frequency change procedure is performed in several steps. Please refer to Section 22.5,
+	MMC/SD/SDIO Basic Programming Model, Section 22.5.2.7.2, MMCHS Clock Frequency Change.
+	Table 22-22 shows the value written in MMCHS1.MMCHS_SYSCTL register.
+	*/
+	MMCHS_SYSCTL( SELECTED_CHS ) = 0x00000147; // MMCHS controller's internal clock is stable and enabled, MMC card's clock is on. Divider value is 5 which means that MMCHS controller is supplying a 19.2 MHz clock < 20 MHz.
+
+	/*
+	 * Another important parameter read from CSD register is MMC system specification version. If this
+parameter points to a value greater than or equal to 4, the MMC card is capable of a speed up to 52 MHz
+and a bus width up to 8 (1, 4 or 8 are the possible options). In order to enable these two extra features,
+MMCHS controller must issue a CMD6 command with specific argument.
+A CMD6 command is issued in the data transfer mode after MMC card is selected. MMC card selection
+consists of sending CMD7 command with MMC card's address in command argument.
+	 */
+	return awaitCommandResponse();
+	// NOTE: In case of success the response is 128bit and will be in MMCHS1.MMCHS_RSP10 - 76 registers
+}
+
 
 // NOTE: SET_BLOCKLEN to 512
 uint32_t
@@ -860,7 +978,7 @@ sendCmd16()
 
 	MMCHS_CON( SELECTED_CHS ) = 0x00000020;	// MMC bus is in push-pull mode. DW8 is enabled.
 	MMCHS_IE( SELECTED_CHS ) = 0x100f0001;	// Enables CERR, CIE, CCRC, CC, CTO and CEB events to occur.
-	MMCHS_ISE( SELECTED_CHS ) = 0x100f0001;	// Enables CERR, CIE, CCRC, CC, CTO and CEB interrupts to rise.
+	// NOTE: not interrupt-driven, polling for events MMCHS_ISE( SELECTED_CHS ) = 0x100f0001;	// Enables CERR, CIE, CCRC, CC, CTO and CEB interrupts to rise.
 	MMCHS_ARG( SELECTED_CHS ) = 0x00000200;	// Block length is 512 = 0x200
 	MMCHS_CMD( SELECTED_CHS ) = 0x101a0000;	// Sends CMD16 whose opcode is 16, response type is 48 bits with CICE and CCCE enabled.
 
@@ -875,7 +993,7 @@ sendCmd18( uint32_t addr )
 
 	MMCHS_CON( SELECTED_CHS ) = 0x00000020;	// MMC bus is in push-pull mode. DW8 is enabled.
 	MMCHS_IE( SELECTED_CHS ) = 0x107f0023;	// Enables CERR, CIE, CCRC, CC, TC, BRR, CTO, DTO, DCRC, DEB and CEB events to occur.
-	MMCHS_ISE( SELECTED_CHS ) = 0x107f0023;	// Enables CERR, CIE, CCRC, CC, TC, BRR, CTO, DTO, DCRC, DEB and CEB interrupts to rise.
+	// NOTE: not interrupt-driven, polling for events MMCHS_ISE( SELECTED_CHS ) = 0x107f0023;	// Enables CERR, CIE, CCRC, CC, TC, BRR, CTO, DTO, DCRC, DEB and CEB interrupts to rise.
 	MMCHS_ARG( SELECTED_CHS ) = addr;	// address
 	MMCHS_BLK( SELECTED_CHS ) = 0x00080200;	// (number_blocks << 16) | (block_length)
 	MMCHS_CMD( SELECTED_CHS ) = 0x123A0032;	// Sends CMD18 whose opcode is 18, response type is 48 bits, with CICE, DP, MSBS, BCE, DE, DDIR and CCCE enabled.
@@ -883,7 +1001,7 @@ sendCmd18( uint32_t addr )
 	return awaitCommandResponse();
 }
 
-// NOTE: SET_BLOCK_COUNT to 1
+// NOTE: SET_BLOCK_COUNT
 uint32_t
 sendCmd23()
 {
@@ -891,9 +1009,9 @@ sendCmd23()
 
 	MMCHS_CON( SELECTED_CHS ) = 0x00000020;	// MMC bus is in push-pull mode. DW8 is enabled.
 	MMCHS_IE( SELECTED_CHS ) = 0x100f0001;	// Enables CERR, CIE, CCRC, CC, CTO and CEB events to occur.
-	MMCHS_ISE( SELECTED_CHS ) = 0x100f0001; // Enables CERR, CIE, CCRC, CC, CTO and CEB interrupts to rise.
-	MMCHS_ARG( SELECTED_CHS ) = 0x00000008; // Number of 512-byte blocks in 4 KB buffer is 8.
-	MMCHS_CMD( SELECTED_CHS ) = 0x101a0000; // Sends CMD23 whose opcode is 23, response type is 48 bits with CICE and CCCE enabled.
+	// NOTE: not interrupt-driven, polling for events MMCHS_ISE( SELECTED_CHS ) = 0x100f0001; // Enables CERR, CIE, CCRC, CC, CTO and CEB interrupts to rise.
+	MMCHS_ARG( SELECTED_CHS ) = 0x00000008; // Number of 512-byte blocks in 4 KB buffer is 8. TODO: adjust to real buffer-size!
+	MMCHS_CMD( SELECTED_CHS ) = 0x171a0000; // Sends CMD23 whose opcode is 23, response type is 48 bits with CICE and CCCE enabled.
 
 	return awaitCommandResponse();
 }
@@ -934,7 +1052,7 @@ sendCmd55( void )
 
 	MMCHS_CON( SELECTED_CHS ) = 0x00000001;
 	MMCHS_IE( SELECTED_CHS ) = 0x100f0001;
-	MMCHS_ISE( SELECTED_CHS ) = 0x100f0001;
+	// NOTE: not interrupt-driven, polling for events MMCHS_ISE( SELECTED_CHS ) = 0x100f0001;
 	MMCHS_CMD( SELECTED_CHS ) = 0x371a0000;
 
 	return awaitCommandResponse();

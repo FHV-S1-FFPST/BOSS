@@ -26,7 +26,6 @@ static void setBusPower( bool enable );
 static uint32_t setBusFrequency( uint32_t freq_in, uint32_t freq_out, bool bypass );
 static void setInternalClock( bool enable );
 static void sendInitStream( void );
-
 static void defaultInit( void );
 static void	initProcedureStart( void );
 static void	preCardIdentificationConfig( void );
@@ -222,31 +221,34 @@ sdHalInit()
 {
 	// TODO: need to get an interrupt when card is inserted
 
-	//TODO: HSMMCSDControllerInit
-	// NOTE: the initializatino follows the programming flow from OMAP35x.pdf at page 3177
-
-	// TODO: not found in starterware
 	enableIfaceAndFunctionalClock();
-	// OK: same as in starterware
 	softwareReset();
-	// OK: same as in starterware
+
+	// NOTE: this flow follows HSMMCSDControllerInit from starterware
+	/*
 	resetLines( MMCHS_SYSCTL_SRA_BIT );
-	// OK: same as in starterware
+
 	selectSupportedVoltage( MMCHS_CAPA_VS18_BIT | MMCHS_CAPA_VS30_BIT );
-	// OK: same as in starterware
+
 	systemConfig( MMCHS_SYSCONFIG_AUTOIDLE_BIT );
-	// OK: same as in starterware
+
 	setBusWidth( BUS_WIDTH_1BIT );
-	// OK: same as in starterware
+
 	setBusVoltage( MMCHS_HCTL_SDVS_30V_BIT );
-	// OK: same as in starterware
+
 	setBusPower( TRUE );
-	// OK same as in starterware
+
 	if ( setBusFrequency( SDMMC_CONTROLLER_CLOCK, SDMMC_BUS_CLOCK, FALSE ) )
 	{
 		return 1;
 	}
-	// OK: same as in starterware
+	*/
+
+	// NOTE: the initializatino follows the programming flow from OMAP35x.pdf at page 3177
+	defaultInit();
+	initProcedureStart();
+	preCardIdentificationConfig();
+
 	sendInitStream();
 
 	identifyCard();
@@ -356,19 +358,6 @@ setBusPower( bool enable )
 	}
 }
 
-/**
- * \brief   Set output bus frequency
- *
- * \param   freq_in       The input/ref frequency to the controller
- * \param   freq_out      The required output frequency on the bus
- * \param   bypass        If the reference clock is to be bypassed
- *
- * \return   0  on clock enable success
- *          -1  on clock enable fail
- *
- * \note: If the clock is set properly, the clocks are enabled to the card with
- * the return of this function
- **/
 uint32_t
 setBusFrequency( uint32_t freq_in, uint32_t freq_out, bool bypass )
 {
@@ -452,7 +441,7 @@ awaitInternalClockStable()
 	AWAIT_BITS_SET( MMCHS_SYSCTL( SELECTED_CHS ), MMCHS_SYSCTL_ICS_BIT );
 }
 
-/*
+
 void
 defaultInit( void )
 {
@@ -484,6 +473,7 @@ preCardIdentificationConfig( void )
 	MMCHS_CON( SELECTED_CHS ) = MMCHS_CON_OD_BIT;
 }
 
+/*
 void
 configIdleAndWakeup( void )
 {

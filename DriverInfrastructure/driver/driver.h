@@ -11,8 +11,6 @@
 #include "ioctl.h"
 #include "return_code.h"
 
-
-
 typedef struct driver {
 	RETURN_CODE (*open) (struct driver *self);
 	RETURN_CODE (*ioctl) (struct driver *self, enum IOCTL_CMD cmd, void *data);
@@ -22,7 +20,7 @@ typedef struct driver {
 
 enum DRIVER_TYPE {
 	SERIAL_DRIVER = 0,
-	HDMI_DRIVER = 0
+	HDMI_DRIVER = 1
 };
 
 #endif /* DRIVER_H_ */

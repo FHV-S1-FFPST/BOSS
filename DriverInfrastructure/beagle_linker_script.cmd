@@ -5,12 +5,12 @@
 //
 
 -stack           0x00002000
--heap            0x00002000
+-heap            0x00F00000
 
 MEMORY
 {
 	int_ram:	ORIGIN = 0x40200000		LENGTH = 0x0000FFFF
-	ext_ddr:	ORIGIN = 0x82000000		LENGTH = 0x00010000
+	ext_ddr:	ORIGIN = 0x82000000		LENGTH = 0xF0100000
 }
 
 SECTIONS
@@ -23,6 +23,8 @@ SECTIONS
 	.data       > ext_ddr
 	.cinit      > ext_ddr
 	.cio        > ext_ddr
+
+	// TODO: add .heap section with meaningful value
 
 	.text       > ext_ddr
 	.sysmem     > ext_ddr

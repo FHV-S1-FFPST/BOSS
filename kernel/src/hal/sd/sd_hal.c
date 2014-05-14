@@ -32,7 +32,7 @@ static void	preCardIdentificationConfig( void );
 static uint32_t identifyCard( void );
 
 // ACCESS TO CARD
-static uint32_t readBlock( uint32_t address, uint8_t* buffer );
+static uint32_t readBlocks( uint32_t block, uint32_t nblk, uint8_t* buffer );
 
 //static void configIdleAndWakeup( void );
 //static void configControllerBus( void );
@@ -41,6 +41,7 @@ static uint32_t readBlock( uint32_t address, uint8_t* buffer );
 static uint32_t isCardBusy( void );
 static void awaitDataLineAvailable( void );
 static void awaitBufferReadReady( void );
+static void clearBufferReadReady( void );
 static uint32_t isTransferComplete( void );
 static void resetMMCIDataLine( void );
 static void resetMMCICmdLine( void );
@@ -61,7 +62,8 @@ static uint32_t sendCmd7( void );
 static uint32_t sendCmd8( void );
 static uint32_t sendCmd9( void );
 static uint32_t sendCmd16( void );
-static uint32_t sendCmd18( uint32_t addr );
+static uint32_t sendCmd18( uint32_t addr, uint32_t nblk );
+static uint32_t sendCmd17( uint32_t addr );
 static uint32_t sendCmd23( void );
 static uint32_t sendCmd55( void );
 static uint32_t sendACmd41( uint8_t hcsFlag );
@@ -214,7 +216,32 @@ static uint32_t sendACmd41( uint8_t hcsFlag );
 #define BLOCK_LEN 		512
 
 // TODO: remove after test
-static uint8_t blockBuffer[ 512 ];
+static uint8_t blockBuffer[ 1024 ];
+
+static CARD_INFO cardInfo;
+
+#define SD_CARD_CSD_VERSION(crd) (((crd).raw_csd[3] & 0xC0000000) >> 30)
+
+#define SD_CSD0_DEV_SIZE(csd3, csd2, csd1, csd0) (((csd2 & 0x000003FF) << 2) | ((csd1 & 0xC0000000) >> 30))
+#define SD_CSD0_MULT(csd3, csd2, csd1, csd0) ((csd1 & 0x00038000) >> 15)
+#define SD_CSD0_RDBLKLEN(csd3, csd2, csd1, csd0) ((csd2 & 0x000F0000) >> 16)
+#define SD_CSD0_TRANSPEED(csd3, csd2, csd1, csd0) ((csd3 & 0x000000FF) >> 0)
+
+#define SD_CARD0_DEV_SIZE(crd) SD_CSD0_DEV_SIZE((crd).raw_csd[3], (crd).raw_csd[2], (crd).raw_csd[1], (crd).raw_csd[0])
+#define SD_CARD0_MULT(crd) SD_CSD0_MULT((crd).raw_csd[3], (crd).raw_csd[2], (crd).raw_csd[1], (crd).raw_csd[0])
+#define SD_CARD0_RDBLKLEN(crd) SD_CSD0_RDBLKLEN((crd).raw_csd[3], (crd).raw_csd[2], (crd).raw_csd[1], (crd).raw_csd[0])
+#define SD_CARD0_TRANSPEED(crd) SD_CSD0_TRANSPEED((crd).raw_csd[3], (crd).raw_csd[2], (crd).raw_csd[1], (crd).raw_csd[0])
+#define SD_CARD0_NUMBLK(crd) ((SD_CARD0_DEV_SIZE((crd)) + 1) * (1 << (SD_CARD0_MULT((crd)) + 2)))
+#define SD_CARD0_SIZE(crd) ((SD_CARD0_NUMBLK((crd))) * (1 << (SD_CARD0_RDBLKLEN(crd))))
+
+#define SD_CSD1_DEV_SIZE(csd3, csd2, csd1, csd0) (((csd2 & 0x0000003F) << 16) | ((csd1 & 0xFFFF0000) >> 16))
+#define SD_CSD1_RDBLKLEN(csd3, csd2, csd1, csd0) ((csd2 & 0x000F0000) >> 16)
+#define SD_CSD1_TRANSPEED(csd3, csd2, csd1, csd0) ((csd3 & 0x000000FF) >> 0)
+
+#define SD_CARD1_DEV_SIZE(crd) SD_CSD1_DEV_SIZE((crd).raw_csd[3], (crd).raw_csd[2], (crd).raw_csd[1], (crd).raw_csd[0])
+#define SD_CARD1_RDBLKLEN(crd) SD_CSD1_RDBLKLEN((crd).raw_csd[3], (crd).raw_csd[2], (crd).raw_csd[1], (crd).raw_csd[0])
+#define SD_CARD1_TRANSPEED(crd) SD_CSD1_TRANSPEED((crd).raw_csd[3], (crd).raw_csd[2], (crd).raw_csd[1], (crd).raw_csd[0])
+#define SD_CARD1_SIZE(crd) ((SD_CARD1_DEV_SIZE((crd)) + 1) * (512 * 1024))
 
 uint32_t
 sdHalInit()
@@ -253,7 +280,9 @@ sdHalInit()
 
 	identifyCard();
 
-	readBlock( 0, blockBuffer );
+	memset( blockBuffer, 0, sizeof( blockBuffer ) );
+
+	readBlocks( 0, 2, blockBuffer );
 
 	return 0;
 }
@@ -441,7 +470,6 @@ awaitInternalClockStable()
 	AWAIT_BITS_SET( MMCHS_SYSCTL( SELECTED_CHS ), MMCHS_SYSCTL_ICS_BIT );
 }
 
-
 void
 defaultInit( void )
 {
@@ -575,24 +603,26 @@ identifyCard( void )
 
 	uint8_t hcsFlag = 0;
 
+	memset( &cardInfo, 0, sizeof( CARD_INFO ) );
+
 	// send GO_IDLE_STATE
 	if ( sendCmd0() )
 	{
-		// TODO: an error occured sending CMD0
+		// an error occured sending CMD0
 		return 1;
 	}
 
 	// cmd5 is reserved for I/O cards: SDIO. will return 0 if it is SDIO
 	if ( 0 == sendCmd5() )
 	{
-		// TODO: handle problem: we don't do SDIO for now
+		// TODO handle problem: we don't do SDIO for now
 		return 1;
 	}
 
 	// send GO_IDLE_STATE again
 	if ( sendCmd0() )
 	{
-		// TODO: an error occured sending CMD0
+		// an error occured sending CMD0
 		return 1;
 	}
 
@@ -609,7 +639,7 @@ identifyCard( void )
 			return 1;
 		}
 
-		hcsFlag = 1;
+		hcsFlag = TRUE;
 	}
 
 	while ( 1 )
@@ -617,7 +647,7 @@ identifyCard( void )
 		// send APP_CMD to notify card that next command will be application specific
 		if ( sendCmd55() )
 		{
-			// TODO: an error occured sending CMD55
+			// an error occured sending CMD55
 			return 1;
 		}
 
@@ -630,9 +660,10 @@ identifyCard( void )
 			{
 				// NOTE: it is a SD card compliant with standard 1.x
 
-				// TODO:
-				// card->ocr = cmd.rsp[0];
-				// card->highCap = (card->ocr & SD_OCR_HIGH_CAPACITY) ? 1 : 0;
+				// store ocr in card-info
+				cardInfo.ocr = MMCHS_RSP10( SELECTED_CHS );
+				// check if card is high-capacity or not (HCR-bit in OCR at position 30)
+				cardInfo.highCap = ( cardInfo.ocr & ( 1 << 30 ) ) ? 1 : 0;
 
 				goto cardIdentified;
 			}
@@ -665,7 +696,11 @@ cardIdentified:
 		return 1;
 	}
 
-	// TODO: copy all rsp to cards raw_cid: memcpy(card->raw_csd, cmd.rsp, 16);
+	// store card-info just returned by CMD2 in RSP10-76
+	cardInfo.raw_cid[ 0 ] = MMCHS_RSP10( SELECTED_CHS );
+	cardInfo.raw_cid[ 1 ] = MMCHS_RSP32( SELECTED_CHS );
+	cardInfo.raw_cid[ 2 ] = MMCHS_RSP54( SELECTED_CHS );
+	cardInfo.raw_cid[ 3 ] = MMCHS_RSP76( SELECTED_CHS );
 
 	// send SEND_RELATIVE_ADDR to ask card to publish new realtive address
 	if ( sendCmd3() )
@@ -673,7 +708,20 @@ cardIdentified:
 		return 1;
 	}
 
-	// TODO: card->rca = SD_RCA_ADDR(cmd.rsp[0]);
+	// store RCA just returned by CMD3
+	cardInfo.rca = ( MMCHS_RSP10( SELECTED_CHS ) & 0xFFFF0000 ) >> 16;
+
+	// send SEND_CSD: request card-specific data
+	if ( sendCmd9() )
+	{
+		return 1;
+	}
+
+	// store card-specific data just returned by CMD9 in RSP10-76
+	cardInfo.raw_csd[ 0 ] = MMCHS_RSP10( SELECTED_CHS );
+	cardInfo.raw_csd[ 1 ] = MMCHS_RSP32( SELECTED_CHS );
+	cardInfo.raw_csd[ 2 ] = MMCHS_RSP54( SELECTED_CHS );
+	cardInfo.raw_csd[ 3 ] = MMCHS_RSP76( SELECTED_CHS );
 
 	/* NOTE: After CMD3 command transfer is completed successfully, an auto-negotiation on voltage value an start.
 	 * This is the frontier when the MMCHS controller should switch from identification mode to transfer mode.
@@ -689,10 +737,20 @@ cardIdentified:
 
 */
 
-	// TODO: send cmd9 to obtain card specific data
-	// TODO: AGAIN copy all rsp to cards raw_cid: memcpy(card->raw_csd, cmd.rsp, 16);
-
-	// TODO: see https://github.com/embest-tech/AM335X_StarterWare_02_00_01_01/blob/master/mmcsdlib/mmcsd_proto.c line 478 to continue
+	if ( SD_CARD_CSD_VERSION( cardInfo ) )
+	{
+		cardInfo.tranSpeed = SD_CARD1_TRANSPEED(cardInfo);
+		cardInfo.blkLen = 1 << (SD_CARD1_RDBLKLEN(cardInfo));
+		cardInfo.size = SD_CARD1_SIZE(cardInfo);
+		cardInfo.nBlks = cardInfo.size / cardInfo.blkLen;
+	}
+	else
+	{
+		cardInfo.tranSpeed = SD_CARD0_TRANSPEED(cardInfo);
+		cardInfo.blkLen = 1 << (SD_CARD0_RDBLKLEN(cardInfo));
+		cardInfo.nBlks = SD_CARD0_NUMBLK(cardInfo);
+		cardInfo.size = SD_CARD0_SIZE(cardInfo);
+	}
 
 	// send SELECT/DESELECT_CARD to select card
 	if ( sendCmd7() )
@@ -702,58 +760,78 @@ cardIdentified:
 
 	// NOTE: at this point the card is initialized, identified and ready to be used
 
+	// send block length only in case of standard capacity-card, send it ONCE after selection
+	if ( ! cardInfo.highCap )
+	{
+		// send block length
+		if ( sendCmd16() )
+		{
+			// an error occured during sending the command, return immediately
+			return 1;
+		}
+	}
+
 	return 0;
 }
 
 uint32_t
-readBlock( uint32_t addr, uint8_t* buffer )
+readBlocks( uint32_t block, uint32_t nblk, uint8_t* buffer )
 {
 	// NOTE: see OMAP35x.pdf page 3168
 
+	uint32_t i = 0;
+	uint32_t address = 0;
+
 	awaitDataLineAvailable();
 
-	// TODO: won't be needed when using high capacity SD
-	if ( sendCmd16() )
+	if ( cardInfo.highCap )
 	{
-		// an error occured during sending the command, return immediately
-		return 1;
+		// high-capacity cards read in blocks
+		address = block;
+	}
+	else
+	{
+		// standard-capacity cards read in bytes
+		address = block * BLOCK_LEN;
 	}
 
-	if ( sendCmd23() )
+	if ( 1 == nblk )
 	{
-		// an error occured during sending the command, return immediately
-		return 1;
+		// NOTE: address differ for standard and high capacity: see page 52 of sd_spec 2.0 4.3.14 Command Functional Difference in High Capacity SD Memory Card
+		if ( sendCmd17( address ) )
+		{
+			// an error occured during sending the command, return immediately
+			return 1;
+		}
+	}
+	else
+	{
+		// NOTE: address differ for standard and high capacity: see page 52 of sd_spec 2.0 4.3.14 Command Functional Difference in High Capacity SD Memory Card
+		if ( sendCmd18( address, nblk ) )
+		{
+			// an error occured during sending the command, return immediately
+			return 1;
+		}
 	}
 
-	// NOTE: address differ for standard and high capacity: see page 52 of sd_spec 2.0 4.3.14 Command Functional Difference in High Capacity SD Memory Card
-	if ( sendCmd18( addr ) )
+	// await buffer-ready interrupt-flag set: will be signaled when MMCi.MMCHS_PSTATE[11] BRE is set.
+	// if MMCHS_DATA is accessed before, this will lead to a  bad access (MMCi.MMCHS_STAT[29] BADA)
+	awaitBufferReadReady();
+
+	// clearBufferReadReady();
+
+	uint32_t readBytes = nblk * BLOCK_LEN;
+
+	for ( i = 0; i < readBytes; i += 4 )
 	{
-		// an error occured during sending the command, return immediately
-		return 1;
-	}
-
-	// NOTE: Repeat MMCHS_DATA access (BLEN + 3)/4 times.
-	uint32_t readTimes = ( BLOCK_LEN + 3 ) / 4;
-
-	do
-	{
-		// TODO: CHECK: page 3154: A read access to the MMCi.MMCHS_DATA register is allowed only when the buffer read enable status is
-		// set to 1 (MMCi.MMCHS_PSTATE[11] BRE); otherwise, a bad access (MMCi.MMCHS_STAT[29] BADA) is
-		// signaled.
-
-		awaitBufferReadReady();
-
 		// NOTE: read 4bytes of data from data-address, will be moved by controller automatically
-		uint32_t data = MMCHS_DATA( SELECTED_CHS );
+		volatile uint32_t data = MMCHS_DATA( SELECTED_CHS );
 
-		// TODO: CHECK: page 3156 MMCi.MMCHS_STAT[29] BADA: Bad access to data space
-
-		buffer[ readTimes * 4 + 0 ] = 0xFF & ( data >> 0 );
-		buffer[ readTimes * 4 + 1 ] = 0xFF & ( data >> 8 );
-		buffer[ readTimes * 4 + 2 ] = 0xFF & ( data >> 16 );
-		buffer[ readTimes * 4 + 3 ] = 0xFF & ( data >> 24 );
-
-	} while ( --readTimes );
+		buffer[ i + 0 ] = 0xFF & ( data >> 0 );
+		buffer[ i + 1 ] = 0xFF & ( data >> 8 );
+		buffer[ i + 2 ] = 0xFF & ( data >> 16 );
+		buffer[ i + 3 ] = 0xFF & ( data >> 24 );
+	}
 
 	// TODO: if Auto CMD12 is enabled (MMCi.MMCHS_CMD[2] ACEN bit to 0x1) then nothing has to be done, otherwise CMD12 needs to be sent now
 
@@ -888,6 +966,13 @@ awaitBufferReadReady( void )
 }
 
 void
+clearBufferReadReady( void )
+{
+	BIT_CLEAR( MMCHS_STAT( SELECTED_CHS ), MMCHS_STAT_BRR_BIT );
+	AWAIT_BITS_CLEARED( MMCHS_STAT( SELECTED_CHS ), MMCHS_STAT_BRR_BIT );
+}
+
+void
 awaitDataLineAvailable( void )
 {
 	// NOTE: if bit 1 (DATI) of MMCHS_PSTATE is 1 data-lines are busy
@@ -990,7 +1075,7 @@ sendCmd3( void )
 
 	MMCHS_CON( SELECTED_CHS ) = MMCHS_CON_OD_BIT;
 	MMCHS_IE( SELECTED_CHS ) = MMCHS_IE_CERR_BIT | MMCHS_IE_CIE_BIT | MMCHS_IE_CCRC_BIT | MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CEB_BIT;
-	MMCHS_ARG( SELECTED_CHS ) = 0x00010000; // the MMC cards address
+	MMCHS_ARG( SELECTED_CHS ) = 0x00010000; // TODO: make it nice: the MMC cards address
 	MMCHS_CMD( SELECTED_CHS ) =	MMCHS_CMD_INDX_BITS( 3 ) | MMCHS_CMD_RSP_TYPE_48_BIT | MMCHS_CMD_CICE_BIT | MMCHS_CMD_CCCE_BIT;
 
 	return awaitCommandResponse();
@@ -1078,7 +1163,7 @@ sendCmd7( void )
 
 	MMCHS_CON( SELECTED_CHS ) = 0x00000000;
 	MMCHS_IE( SELECTED_CHS ) = MMCHS_IE_CERR_BIT | MMCHS_IE_CIE_BIT | MMCHS_IE_CCRC_BIT | MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CEB_BIT;
-	MMCHS_ARG( SELECTED_CHS ) = 0x00010000; // TODO: RCA
+	MMCHS_ARG( SELECTED_CHS ) = cardInfo.rca << 16;
 	MMCHS_CMD( SELECTED_CHS ) = MMCHS_CMD_INDX_BITS( 7 ) | MMCHS_CMD_RSP_TYPE_48BUSY_BIT | MMCHS_CMD_CICE_BIT | MMCHS_CMD_CCCE_BIT;
 
 	/* TODO: After a CMD7 transfer is complete, the MMC card is ready to receive a CMD6 command. CMD6 command
@@ -1113,7 +1198,6 @@ sendCmd8( void )
 	return awaitCommandResponse();
 }
 
-// TODO: USE IT
 /* NOTE: SEND_CSD
  * Addressed card sends its card-specific data (CSD) on the CMD line.
  *
@@ -1130,7 +1214,7 @@ sendCmd9( void )
 
 	MMCHS_CON( SELECTED_CHS ) = 0x00000000;
 	MMCHS_IE( SELECTED_CHS ) = MMCHS_IE_CCRC_BIT | MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CEB_BIT;
-	MMCHS_ARG( SELECTED_CHS ) = 0x00010000;	// TODO: RCA
+	MMCHS_ARG( SELECTED_CHS ) = cardInfo.rca << 16;
 	MMCHS_CMD( SELECTED_CHS ) = MMCHS_CMD_INDX_BITS( 9 ) | MMCHS_CMD_RSP_TYPE_136_BIT | MMCHS_CMD_CCCE_BIT;
 
 	// TODO: handle
@@ -1142,8 +1226,9 @@ sendCmd9( void )
 	Clock frequency change procedure is performed in several steps. Please refer to Section 22.5,
 	MMC/SD/SDIO Basic Programming Model, Section 22.5.2.7.2, MMCHS Clock Frequency Change.
 	Table 22-22 shows the value written in MMCHS1.MMCHS_SYSCTL register.
-	*/
+
 	MMCHS_SYSCTL( SELECTED_CHS ) = 0x00000147; // MMCHS controller's internal clock is stable and enabled, MMC card's clock is on. Divider value is 5 which means that MMCHS controller is supplying a 19.2 MHz clock < 20 MHz.
+	*/
 
 	/*
 	 * Another important parameter read from CSD register is MMC system specification version. If this
@@ -1177,11 +1262,34 @@ sendCmd16()
 
 	MMCHS_CON( SELECTED_CHS ) = MMCHS_CON_DW8_BIT; // MMC bus is in push-pull mode. DW8 is enabled.
 	MMCHS_IE( SELECTED_CHS ) = MMCHS_IE_CERR_BIT | MMCHS_IE_CIE_BIT | MMCHS_IE_CCRC_BIT | MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CEB_BIT;
-	MMCHS_ARG( SELECTED_CHS ) = 0x00000200;	// Block length is 512 = 0x200
+	MMCHS_ARG( SELECTED_CHS ) = BLOCK_LEN;	// Block length is 512 = 0x200
 	MMCHS_CMD( SELECTED_CHS ) = MMCHS_CMD_INDX_BITS( 16 ) | MMCHS_CMD_RSP_TYPE_48_BIT | MMCHS_CMD_CICE_BIT | MMCHS_CMD_CCCE_BIT;
 
 	return awaitCommandResponse();
 }
+
+/* NOTE: READ_SINGLE_BLOCK
+ * In the case of a Standard Capacity SD Memory Card, this command, this command reads a block of the size selected by the SET_BLOCKLEN command.
+ * 1 In the case of a High Capacity Card, block length is fixed 512 Bytes regardless of the SET_BLOCKLEN command
+ *
+ * type:	adtc
+ * resp:	R1
+ * arg:		[31:0] data address: Data address is in byte units in a Standard Capacity SD Memory Card and in block (512 Byte) units in a High Capacity SD Memory Card.
+ */
+uint32_t
+sendCmd17( uint32_t addr )
+{
+	clearIrStatus();
+
+	MMCHS_CON( SELECTED_CHS ) = MMCHS_CON_DW8_BIT;	// MMC bus is in push-pull mode. DW8 is enabled.
+	MMCHS_IE( SELECTED_CHS ) = MMCHS_IE_CERR_BIT | MMCHS_IE_CIE_BIT | MMCHS_IE_CCRC_BIT | MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CEB_BIT | MMCHS_IE_TC_BIT | MMCHS_IE_BRR_BIT | MMCHS_IE_DTO_BIT | MMCHS_IE_DCRC_BIT | MMCHS_IE_DEB_BIT;
+	MMCHS_ARG( SELECTED_CHS ) = addr;	// address
+	MMCHS_BLK( SELECTED_CHS ) = ( 1 << 16 ) | ( BLOCK_LEN ); // read one block. starts at bit 16, bit 0-15 contains block-size and is ALWAYS set to 512
+	MMCHS_CMD( SELECTED_CHS ) = MMCHS_CMD_INDX_BITS( 17 ) | MMCHS_CMD_RSP_TYPE_48_BIT | MMCHS_CMD_CICE_BIT | MMCHS_CMD_DP_BIT | MMCHS_CMD_DDIR_BIT | MMCHS_CMD_CCCE_BIT /*| MMCHS_CMD_ACEN_BIT*/;
+
+	return awaitCommandResponse();
+}
+
 
 /* NOTE: READ_MULTIPLE_BLOCK
  * Continuously transfers data blocks from card to host until interrupted by a STOP_TRANSMISSION command.
@@ -1192,7 +1300,7 @@ sendCmd16()
  * arg:		[31:0] data address: Data address is in byte units in a Standard Capacity SD Memory Card and in block (512 Byte) units in a High Capacity SD Memory Card.
  */
 uint32_t
-sendCmd18( uint32_t addr )
+sendCmd18( uint32_t addr, uint32_t nblk )
 {
 	// NOTE: Issuing CMD18 starts the finite, multiple block read transfer. (see OMAP35x.pdf page 3187)
 
@@ -1201,8 +1309,8 @@ sendCmd18( uint32_t addr )
 	MMCHS_CON( SELECTED_CHS ) = MMCHS_CON_DW8_BIT;	// MMC bus is in push-pull mode. DW8 is enabled.
 	MMCHS_IE( SELECTED_CHS ) = MMCHS_IE_CERR_BIT | MMCHS_IE_CIE_BIT | MMCHS_IE_CCRC_BIT | MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CEB_BIT | MMCHS_IE_TC_BIT | MMCHS_IE_BRR_BIT | MMCHS_IE_DTO_BIT | MMCHS_IE_DCRC_BIT | MMCHS_IE_DEB_BIT;
 	MMCHS_ARG( SELECTED_CHS ) = addr;	// address
-	MMCHS_BLK( SELECTED_CHS ) = 0x00080200;	// (number_blocks << 16) | (block_length)
-	MMCHS_CMD( SELECTED_CHS ) = MMCHS_CMD_INDX_BITS( 18 ) | MMCHS_CMD_RSP_TYPE_48_BIT | MMCHS_CMD_CICE_BIT | MMCHS_CMD_DP_BIT | MMCHS_CMD_MSBS_BIT | MMCHS_CMD_BCE_BIT | MMCHS_CMD_DDIR_BIT | MMCHS_CMD_CCCE_BIT;
+	MMCHS_BLK( SELECTED_CHS ) = ( nblk << 16 ) | ( BLOCK_LEN ); // write number of blocks/bytes to read. starts at bit 16, bit 0-15 contains block-size and is ALWAYS set to 512
+	MMCHS_CMD( SELECTED_CHS ) = MMCHS_CMD_INDX_BITS( 18 ) | MMCHS_CMD_RSP_TYPE_48_BIT | MMCHS_CMD_CICE_BIT | MMCHS_CMD_DP_BIT | MMCHS_CMD_MSBS_BIT | MMCHS_CMD_BCE_BIT /*| MMCHS_CMD_ACEN_BIT */ | MMCHS_CMD_DDIR_BIT | MMCHS_CMD_CCCE_BIT;
 
 	return awaitCommandResponse();
 }
@@ -1263,6 +1371,7 @@ sendCmd55( void )
 
 	MMCHS_CON( SELECTED_CHS ) = MMCHS_CON_OD_BIT;
 	MMCHS_IE( SELECTED_CHS ) = MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CERR_BIT | MMCHS_IE_CIE_BIT | MMCHS_IE_CCRC_BIT | MMCHS_IE_CEB_BIT;
+	MMCHS_ARG( SELECTED_CHS ) = cardInfo.rca << 16;
 	MMCHS_CMD( SELECTED_CHS ) = MMCHS_CMD_INDX_BITS( 55 ) | MMCHS_CMD_RSP_TYPE_48_BIT | MMCHS_CMD_CICE_BIT | MMCHS_CMD_CCCE_BIT;
 
 	return awaitCommandResponse();

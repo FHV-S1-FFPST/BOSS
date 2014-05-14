@@ -6,6 +6,7 @@
  */
 
 
+#include <stdlib.h>
 #include "serial_driver.h"
 #include "../../common/common.h"
 #include "../return_code.h"
@@ -98,7 +99,7 @@ static void* readSerial(Driver_t *self) {
 }
 
 Driver_t *createSerialDriver() {
-	Driver_t *serialDriver = (Driver_t *)malloc(sizeof(Driver_t *));
+	Driver_t *serialDriver = (Driver_t *)malloc(sizeof(Driver_t));
 	serialDriver->ioctl = &ioctlSerial;
 	serialDriver->open = &openSerial;
 

@@ -9,6 +9,7 @@
 #define DRIVER_MANAGER_H_
 
 #include "serial/serial_driver.h"
+#include "hdmi/hdmi_driver.h"
 #include "return_code.h"
 #include "driver.h"
 #include "ioctl.h"

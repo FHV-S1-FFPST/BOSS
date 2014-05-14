@@ -15,7 +15,13 @@
  */
 enum IOCTL_CMD {
 	//Serial commands
-	SERIAL_SET_BAUD_RATE = 1
+	SERIAL_SET_BAUD_RATE = 1,
+
+	// HDMI commands
+	SET_SCALE = 2,
+	DRAW_HORIZONTAL_LINE = 3,
+	DRAW_VERTICAL_LINE = 4,
+	DRAW_STRING_WITH_COLOR = 5
 };
 
 

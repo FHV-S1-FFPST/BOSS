@@ -17,6 +17,13 @@ RETURN_CODE initDrivers() {
 	if(serialDriver->open(serialDriver) == SUCCESS) {
 		loadedDrivers[SERIAL_DRIVER] = *serialDriver;
 	}
+
+	Driver_t *hdmiDriver = createHDMIDriver();
+
+	if(hdmiDriver->open(hdmiDriver) == SUCCESS) {
+		loadedDrivers[HDMI_DRIVER] = *hdmiDriver;
+	}
+
 	return SUCCESS;
 }
 

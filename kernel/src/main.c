@@ -2,6 +2,7 @@
 #include "scheduler/scheduler.h"
 #include "irq/irq.h"
 #include "fs/fat32/fat32.h"
+#include "mmu/mmu.h"
 
 #include "tasksimpl/task1.h"
 
@@ -20,6 +21,7 @@ static int32_t initSystem( void );
 int32_t
 main( void )
 {
+
 	if ( initHardware() )
 	{
 		// initializing hardware failed, exit OS

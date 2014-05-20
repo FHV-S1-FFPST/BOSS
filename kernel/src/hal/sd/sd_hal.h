@@ -11,7 +11,7 @@
 #include <inttypes.h>
 
 uint32_t sdHalInit();
-uint32_t sdHalReadBytes( uint32_t* address, uint32_t* buffer, uint32_t bufferSize );
+uint32_t sdHalReadBlocks( uint32_t block, uint32_t nblk, uint8_t* buffer );
 
 typedef struct {
 	uint32_t raw_cid[ 4 ];

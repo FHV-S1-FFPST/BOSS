@@ -45,11 +45,11 @@ irqTimerResetCounterAndInterrupt( void )
 void
 irqTimerStart( void )
 {
-	halTimerStart( IRQTIMER_ADDR );
+	halTimerStart( IRQTIMER_ADDR, 0xFF );
 }
 
 void
 irqTimerStop( void )
 {
-	halTimerStop( IRQTIMER_ADDR );
+	halTimerStop( IRQTIMER_ADDR, 0xFF );
 }

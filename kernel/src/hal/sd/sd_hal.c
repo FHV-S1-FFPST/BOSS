@@ -16,37 +16,33 @@
 // module-local functions /////////////////////////////////////////
 // INITIALZATION & IDENTIFICATION
 static void enableIfaceAndFunctionalClock( void );
-static void softwareReset( void );
+static uint32_t softwareReset( void );
 static void selectSupportedVoltage( uint32_t voltage );
-static void resetLines( uint32_t lines );
+static uint32_t resetLines( uint32_t lines );
 static void systemConfig( uint32_t flags );
 static void setBusWidth( uint32_t width );
 static void setBusVoltage( uint32_t voltage );
-static void setBusPower( bool enable );
+static uint32_t setBusPower( bool enable );
 static uint32_t setBusFrequency( uint32_t freq_in, uint32_t freq_out, bool bypass );
-static void setInternalClock( bool enable );
+static uint32_t setInternalClock( bool enable );
 static void sendInitStream( void );
 static uint32_t identifyCard( void );
 static uint32_t configBusWidth( void );
 static uint32_t configTransferSpeed( void );
 
 // ACCESS TO CARD
-static uint32_t readBlocks( uint32_t block, uint32_t nblk, uint8_t* buffer );
 static uint32_t readTransferBuffer( uint32_t nBytes, uint8_t* buffer );
-
-//static void configIdleAndWakeup( void );
-//static void configControllerBus( void );
 
 // HELPERS
 static uint32_t isCardBusy( void );
-static void awaitDataLineAvailable( void );
+static uint32_t awaitDataLineAvailable( uint32_t retries );
 static uint32_t isBufferReadReady( void );
 static void clearBufferReadReady( void );
 static uint32_t isTransferComplete( void );
-static void resetMMCIDataLine( void );
-static void resetMMCICmdLine( void );
+static uint32_t resetMMCIDataLine( uint32_t retries );
+static uint32_t resetMMCICmdLine( uint32_t retries );
 static uint32_t awaitCommandResponse( void );
-static void awaitInternalClockStable( void );
+static uint32_t awaitInternalClockStable( uint32_t retries );
 static uint32_t isCommandComplete( void );
 static uint32_t isCommandTimeout( void );
 static uint32_t isDataTimeout( void );
@@ -84,6 +80,7 @@ static uint32_t sendACmd51();
 
 #define SELECTED_CHS		MMCHS1_ADDR
 
+// REGISTERS
 #define MMCHS_SYSCONFIG		READ_REGISTER_OFFSET( SELECTED_CHS, 0x010 ) 	// RW
 #define MMCHS_SYSSTATUS		READ_REGISTER_OFFSET( SELECTED_CHS, 0x014 ) 	// R
 #define MMCHS_CSRE			READ_REGISTER_OFFSET( SELECTED_CHS, 0x024 ) 	// RW
@@ -109,6 +106,7 @@ static uint32_t sendACmd51();
 #define MMCHS_CUR_CAPA		READ_REGISTER_OFFSET( SELECTED_CHS, 0x148 ) 	// RW
 #define MMCHS_REV			READ_REGISTER_OFFSET( SELECTED_CHS, 0x1FC ) 	// R
 
+// BITS for accessing the registers
 #define MMCHS_SYSCONFIG_AUTOIDLE_BIT				0x1
 #define MMCHS_SYSCONFIG_SOFTRESET_BIT 				0x2
 #define MMCHS_SYSCONFIG_ENAWAKEUP_BIT 				0x4
@@ -259,22 +257,23 @@ static uint32_t sendACmd51();
 // at the same time if one requests only blocks LE 512 => hardcode block-size to 512
 #define BLOCK_LEN 		512
 
-// TODO: remove after test
-static uint8_t blockBuffer[ 1024 ];
-
+// the information about the current card
 static CARD_INFO cardInfo;
-
 
 uint32_t
 sdHalInit()
 {
-	// TODO: need to get an interrupt when card is inserted
-
 	enableIfaceAndFunctionalClock();
 
-	softwareReset();
+	if ( softwareReset() )
+	{
+		return 1;
+	}
 
-	resetLines( MMCHS_SYSCTL_SRA_BIT );
+	if ( resetLines( MMCHS_SYSCTL_SRA_BIT ) )
+	{
+		return 1;
+	}
 
 	selectSupportedVoltage( MMCHS_CAPA_VS18_BIT | MMCHS_CAPA_VS30_BIT );
 
@@ -284,7 +283,10 @@ sdHalInit()
 
 	setBusVoltage( MMCHS_HCTL_SDVS_30V_BIT );
 
-	setBusPower( TRUE );
+	if ( setBusPower( TRUE ) )
+	{
+		return 1;
+	}
 
 	// need some initial clock divider otherwise would not work to set the bus frequency
 	MMCHS_SYSCTL = 0x0000a007;
@@ -296,26 +298,72 @@ sdHalInit()
 
 	sendInitStream();
 
-	identifyCard();
+	if ( identifyCard() )
+	{
+		return 1;
+	}
 
-	configBusWidth();
+	if ( configBusWidth() )
+	{
+		return 1;
+	}
 
 	configTransferSpeed();
-
-	memset( blockBuffer, 0, sizeof( blockBuffer ) );
-
-	readBlocks( 0, 2, blockBuffer );
 
 	return 0;
 }
 
 uint32_t
-sdHalReadBytes( uint32_t* address, uint32_t* buffer, uint32_t bufferSize )
+sdHalReadBlocks( uint32_t block, uint32_t nblk, uint8_t* buffer )
 {
-	memset( buffer, 0, bufferSize );
+	// NOTE: see OMAP35x.pdf page 3168
 
-	// TODO: implement
+	uint32_t address = 0;
 
+	// check if datalines are available and stop after some retries
+	if ( awaitDataLineAvailable( 0xFF ) )
+	{
+		return 1;
+	}
+
+	if ( cardInfo.highCap )
+	{
+		// high-capacity cards read in blocks
+		address = block;
+	}
+	else
+	{
+		// standard-capacity cards read in bytes
+		address = block * BLOCK_LEN;
+	}
+
+	if ( 1 == nblk )
+	{
+		// NOTE: address differ for standard and high capacity: see page 52 of sd_spec 2.0 4.3.14 Command Functional Difference in High Capacity SD Memory Card
+		if ( sendCmd17( address ) )
+		{
+			// an error occured during sending the command, return immediately
+			return 1;
+		}
+	}
+	else
+	{
+		// NOTE: address differ for standard and high capacity: see page 52 of sd_spec 2.0 4.3.14 Command Functional Difference in High Capacity SD Memory Card
+		if ( sendCmd18( address, nblk ) )
+		{
+			// an error occured during sending the command, return immediately
+			return 1;
+		}
+	}
+
+	uint32_t nBytes = nblk * BLOCK_LEN;
+
+	if ( readTransferBuffer( nBytes, buffer ) )
+	{
+		return 1;
+	}
+
+	// transfer complete, no error occured
 	return 0;
 }
 
@@ -330,22 +378,44 @@ enableIfaceAndFunctionalClock( void )
 	BIT_SET( CM_FCLKEN1_CORE, CM_EN_MMCHS1_BIT );
 }
 
-void
-softwareReset( void )
+uint32_t
+softwareReset()
 {
 	// NOTE: see OMAP35x.pdf page 3160f and at page 3178
+	uint32_t i = 0;
 
 	// 1. trigger module reset
 	BIT_SET( MMCHS_SYSCONFIG, MMCHS_SYSCONFIG_SOFTRESET_BIT );
+
 	// 2. await finishing of module reset
-	AWAIT_BITS_SET( MMCHS_SYSSTATUS, MMCHS_SYSSTATUS_RESETDONE_BIT );
+	for ( i = 0xFF; i > 0; --i )
+	{
+		if ( BIT_CHECK( MMCHS_SYSSTATUS, MMCHS_SYSSTATUS_RESETDONE_BIT ) )
+		{
+			return 0;
+		}
+	}
+
+	return 1;
+
 }
 
-void
+uint32_t
 resetLines( uint32_t lines )
 {
+	uint32_t i = 0;
+
 	BIT_SET( MMCHS_SYSCTL, lines );
-	AWAIT_BITS_CLEARED( MMCHS_SYSCTL, lines );
+
+	for ( i = 0xFF; i > 0; --i )
+	{
+		if ( ! BIT_CHECK( MMCHS_SYSCTL, lines ) )
+		{
+			return 0;
+		}
+	}
+
+	return 1;
 }
 
 void
@@ -397,18 +467,31 @@ setBusVoltage( uint32_t voltage )
 	BIT_SET( MMCHS_HCTL, voltage );
 }
 
-void
+uint32_t
 setBusPower( bool enable )
 {
 	if ( enable )
 	{
+		uint32_t i = 0;
+
 		BIT_SET( MMCHS_HCTL, MMCHS_HCTL_SDBP_BIT );
-		AWAIT_BITS_SET( MMCHS_HCTL, MMCHS_HCTL_SDBP_BIT );
+
+		for ( i = 0xFF; i > 0; --i )
+		{
+			if ( BIT_CHECK( MMCHS_HCTL, MMCHS_HCTL_SDBP_BIT ) )
+			{
+				return 0;
+			}
+		}
+
+		return 1;
 	}
 	else
 	{
 		BIT_CLEAR( MMCHS_HCTL, MMCHS_HCTL_SDBP_BIT );
 	}
+
+	return 0;
 }
 
 uint32_t
@@ -418,7 +501,10 @@ setBusFrequency( uint32_t freq_in, uint32_t freq_out, bool bypass )
 	volatile unsigned int regVal = 0;
 
     /* First enable the internal clocks */
-    setInternalClock( TRUE );
+    if ( setInternalClock( TRUE ) )
+    {
+    	return 1;
+    }
 
     if ( FALSE == bypass )
     {
@@ -444,7 +530,10 @@ setBusFrequency( uint32_t freq_in, uint32_t freq_out, bool bypass )
         MMCHS_SYSCTL = regVal | ( clkd << 6 );
 
         /* Wait for the interface clock stabilization */
-        awaitInternalClockStable();
+        if ( awaitInternalClockStable( 0xFF ) )
+        {
+        	return 1;
+        }
 
         /* Enable clock to the card */
         BIT_SET( MMCHS_SYSCTL, MMCHS_SYSCTL_CEN_BIT );
@@ -453,19 +542,24 @@ setBusFrequency( uint32_t freq_in, uint32_t freq_out, bool bypass )
     return 0;
 }
 
-void
+uint32_t
 setInternalClock( bool enable )
 {
 	if ( enable )
 	{
 		// await Internal clock stable
 		BIT_SET( MMCHS_SYSCTL, MMCHS_SYSCTL_ICE_BIT );
-		awaitInternalClockStable();
+		if ( awaitInternalClockStable( 0xFF ) )
+		{
+			return 1;
+		}
 	}
 	else
 	{
 		BIT_CLEAR( MMCHS_SYSCTL, MMCHS_SYSCTL_ICE_BIT );
 	}
+
+	return 0;
 }
 
 void
@@ -630,6 +724,7 @@ cardIdentified:
 		}
 	}
 
+	// request SCR - will be transmitted throug a data-read!
 	if ( sendACmd51() )
 	{
 		return 1;
@@ -638,66 +733,18 @@ cardIdentified:
 	uint8_t scrBuffer[ 8 ];
 	memset( scrBuffer, 0, 8 );
 
-	readTransferBuffer( 8, scrBuffer );
-
-	cardInfo.raw_scr[0] = (scrBuffer[3] << 24) | (scrBuffer[2] << 16) | \
-		                   (scrBuffer[1] << 8) | (scrBuffer[0]);
-	cardInfo.raw_scr[1] = (scrBuffer[7] << 24) | (scrBuffer[6] << 16) | \
-                                   (scrBuffer[5] << 8) | (scrBuffer[4]);
-
-	cardInfo.sd_ver = SD_CARD_VERSION( cardInfo );
-	cardInfo.busWidth = SD_CARD_BUSWIDTH( cardInfo );
-
-	return 0;
-}
-
-uint32_t
-readBlocks( uint32_t block, uint32_t nblk, uint8_t* buffer )
-{
-	// NOTE: see OMAP35x.pdf page 3168
-
-	uint32_t address = 0;
-
-	awaitDataLineAvailable();
-
-	if ( cardInfo.highCap )
-	{
-		// high-capacity cards read in blocks
-		address = block;
-	}
-	else
-	{
-		// standard-capacity cards read in bytes
-		address = block * BLOCK_LEN;
-	}
-
-	if ( 1 == nblk )
-	{
-		// NOTE: address differ for standard and high capacity: see page 52 of sd_spec 2.0 4.3.14 Command Functional Difference in High Capacity SD Memory Card
-		if ( sendCmd17( address ) )
-		{
-			// an error occured during sending the command, return immediately
-			return 1;
-		}
-	}
-	else
-	{
-		// NOTE: address differ for standard and high capacity: see page 52 of sd_spec 2.0 4.3.14 Command Functional Difference in High Capacity SD Memory Card
-		if ( sendCmd18( address, nblk ) )
-		{
-			// an error occured during sending the command, return immediately
-			return 1;
-		}
-	}
-
-	uint32_t nBytes = nblk * BLOCK_LEN;
-
-	if ( readTransferBuffer( nBytes, buffer ) )
+	// SCR is transmitted in 8 bytes through a data-read
+	if ( readTransferBuffer( 8, scrBuffer ) )
 	{
 		return 1;
 	}
 
-	// transfer complete, no error occured
+	cardInfo.raw_scr[ 0 ] = ( scrBuffer[ 3 ] << 24 ) | ( scrBuffer[ 2 ] << 16 ) | ( scrBuffer[ 1 ] << 8 ) | ( scrBuffer[ 0 ] );
+	cardInfo.raw_scr[ 1 ] = ( scrBuffer[ 7 ] << 24 ) | ( scrBuffer[ 6 ] << 16 ) | ( scrBuffer[ 5 ] << 8 ) | ( scrBuffer[ 4 ] );
+
+	cardInfo.sd_ver = SD_CARD_VERSION( cardInfo );
+	cardInfo.busWidth = SD_CARD_BUSWIDTH( cardInfo );
+
 	return 0;
 }
 
@@ -738,6 +785,7 @@ configTransferSpeed()
 
 	if ( sendCmd6( arg ) )
 	{
+		// TODO: handle differently, switch to cardInfo.tranSpeed
 		return 1;
 	}
 
@@ -815,9 +863,8 @@ readTransferBuffer( uint32_t nBytes, uint8_t* buffer )
 				clearInterruptBits( MMCHS_STAT_DEB_BIT | MMCHS_STAT_DCRC_BIT );
 
 				// finished with an error
-				resetMMCIDataLine();
+				resetMMCIDataLine( 0xFF );
 				status = 1;
-				break;
 			}
 
 			break;
@@ -830,7 +877,7 @@ readTransferBuffer( uint32_t nBytes, uint8_t* buffer )
 				clearInterruptBits( MMCHS_STAT_DTO_BIT );
 
 				// finished with an error
-				resetMMCIDataLine();
+				resetMMCIDataLine( 0xFF );
 				status = 1;
 				break;
 			}
@@ -863,9 +910,9 @@ awaitCommandResponse()
 			clearInterruptBits( MMCHS_STAT_CTO_BIT | MMCHS_STAT_CCRC_BIT );
 
 			// always need to reset CMD line after error
-			resetMMCICmdLine();
+			resetMMCICmdLine( 0xFF );
 			// reset DATA line after error occured during a command which transmits data
-			resetMMCIDataLine();
+			resetMMCIDataLine( 0xFF );
 			// return 1 to indicate failure
 			return 1;
 		}
@@ -896,24 +943,56 @@ awaitCommandResponse()
 	}
 }
 
-void
-awaitInternalClockStable()
+uint32_t
+awaitInternalClockStable( uint32_t retries )
 {
-	AWAIT_BITS_SET( MMCHS_SYSCTL, MMCHS_SYSCTL_ICS_BIT );
+	uint32_t i = 0;
+
+	for ( i = retries; i > 0; --i )
+	{
+		if ( BIT_CHECK( MMCHS_SYSCTL, MMCHS_SYSCTL_ICS_BIT ) )
+		{
+			return 0;
+		}
+	}
+
+	return 1;
 }
 
-void
-resetMMCIDataLine( void )
+uint32_t
+resetMMCIDataLine( uint32_t retries )
 {
+	uint32_t i = 0;
+
 	BIT_SET( MMCHS_SYSCTL, MMCHS_SYSCTL_SRD_BIT );
-	AWAIT_BITS_CLEARED( MMCHS_SYSCTL, MMCHS_SYSCTL_SRD_BIT );
+
+	for ( i = retries; i > 0; --i )
+	{
+		if ( ! BIT_CHECK( MMCHS_SYSCTL, MMCHS_SYSCTL_SRD_BIT ) )
+		{
+			return 0;
+		}
+	}
+
+	return 1;
 }
 
-void
-resetMMCICmdLine( void )
+uint32_t
+resetMMCICmdLine( uint32_t retries )
 {
+	uint32_t i = 0;
+
 	BIT_SET( MMCHS_SYSCTL, MMCHS_SYSCTL_SRC_BIT );
-	AWAIT_BITS_CLEARED( MMCHS_SYSCTL, MMCHS_SYSCTL_SRC_BIT );
+
+	for ( i = retries; i > 0; --i )
+	{
+		if ( ! BIT_CHECK( MMCHS_SYSCTL, MMCHS_SYSCTL_SRC_BIT ) )
+		{
+			return 0;
+		}
+	}
+
+	return 1;
 }
 
 uint32_t
@@ -946,11 +1025,21 @@ isBufferReadReady( void )
 	return BIT_CHECK( MMCHS_STAT, MMCHS_STAT_BRR_BIT );
 }
 
-void
-awaitDataLineAvailable( void )
+uint32_t
+awaitDataLineAvailable( uint32_t retries )
 {
-	// NOTE: if bit 1 (DATI) of MMCHS_PSTATE is 1 data-lines are busy
-	AWAIT_BITS_CLEARED( MMCHS_PSTATE, MMCHS_PSTATE_DATI_BIT );
+	uint32_t i = 0;
+
+	for ( i = retries; i > 0; --i )
+	{
+		// NOTE: if bit 1 (DATI) of MMCHS_PSTATE is 1 data-lines are busy
+		if ( ! BIT_CHECK( MMCHS_PSTATE, MMCHS_PSTATE_DATI_BIT ) )
+		{
+			return 0;
+		}
+	}
+
+	return 1;
 }
 
 void

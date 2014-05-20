@@ -19,7 +19,7 @@ void
 sysTimerInit( uint32_t ovfAfterMs )
 {
 	// stop timer, maybe was started bevore reset
-	halTimerStop( SYSTIMER_ADDR );
+	halTimerStop( SYSTIMER_ADDR, 0xFF );
 	// TODO: disable post-mode
 	// TODO: disable prescaler
 	// clear all pending interrupts before reset
@@ -48,7 +48,7 @@ sysTimerInit( uint32_t ovfAfterMs )
 	// reset timer-value to reload value
 	halTimerReset( SYSTIMER_ADDR );
 	// start it immediately
-	halTimerStart( SYSTIMER_ADDR );
+	halTimerStart( SYSTIMER_ADDR, 0xFF );
 }
 
 void

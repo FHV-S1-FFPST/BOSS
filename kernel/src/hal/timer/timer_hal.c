@@ -44,20 +44,42 @@
 #define TISR_ALLIT_BITS			0x07
 //////////////////////////////////////////////////////////////////////////////////////////
 
-void
-halTimerStart( uint32_t addr )
+uint32_t
+halTimerStart( uint32_t addr, uint32_t retries )
 {
+	uint32_t i = 0;
+
 	// NOTE: start the timer by writing 1 into the bit 0 of TCLR
 	BIT_SET( TCLR_GPT( addr ), TCLR_ONOFF_BIT );
-	AWAIT_BITS_SET( TCLR_GPT( addr ), TCLR_ONOFF_BIT );
+
+	for ( i = retries; i > 0; --i )
+	{
+		if ( BIT_CHECK( TCLR_GPT( addr ), TCLR_ONOFF_BIT ) )
+		{
+			return 0;
+		}
+	}
+
+	return 1;
 }
 
-void
-halTimerStop( uint32_t addr )
+uint32_t
+halTimerStop( uint32_t addr, uint32_t retries )
 {
+	uint32_t i = 0;
+
 	// NOTE: stop the timer by writing 0 into the bit 0 of TCLR
 	BIT_CLEAR( TCLR_GPT( addr ), TCLR_ONOFF_BIT );
-	AWAIT_BITS_CLEARED( TCLR_GPT( addr ), TCLR_ONOFF_BIT );
+
+	for ( i = retries; i > 0; --i )
+	{
+		if ( ! BIT_CHECK( TCLR_GPT( addr ), TCLR_ONOFF_BIT ) )
+		{
+			return 0;
+		}
+	}
+
+	return 1;
 }
 
 void

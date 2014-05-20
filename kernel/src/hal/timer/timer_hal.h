@@ -28,8 +28,8 @@
 
 #define HAL_TIMER_TICKS_PER_MS 	1000		// system-ticks per ms
 
-void halTimerStart( uint32_t addr );
-void halTimerStop( uint32_t addr );
+uint32_t halTimerStart( uint32_t addr, uint32_t retries );
+uint32_t halTimerStop( uint32_t addr, uint32_t retries );
 void halTimerReset( uint32_t addr );
 void halTimerClearAllInterrupts( uint32_t addr );
 void halTimerClearInterrupt( uint32_t addr, uint32_t itBit );

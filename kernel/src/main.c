@@ -21,7 +21,6 @@ static int32_t initSystem( void );
 int32_t
 main( void )
 {
-
 	if ( initHardware() )
 	{
 		// initializing hardware failed, exit OS

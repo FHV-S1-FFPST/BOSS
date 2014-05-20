@@ -26,6 +26,7 @@ typedef struct {
 	uint32_t size;
 	uint32_t nBlks;
 	uint8_t busWidth;
+	uint8_t sd_ver;
 } CARD_INFO;
 
 #endif /* SD_HAL_H_ */

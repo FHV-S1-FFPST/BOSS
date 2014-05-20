@@ -26,9 +26,6 @@ static void setBusPower( bool enable );
 static uint32_t setBusFrequency( uint32_t freq_in, uint32_t freq_out, bool bypass );
 static void setInternalClock( bool enable );
 static void sendInitStream( void );
-static void defaultInit( void );
-static void	initProcedureStart( void );
-static void	preCardIdentificationConfig( void );
 static uint32_t identifyCard( void );
 static uint32_t configBusWidth( void );
 static uint32_t configTransferSpeed( void );
@@ -43,21 +40,25 @@ static uint32_t readTransferBuffer( uint32_t nBytes, uint8_t* buffer );
 // HELPERS
 static uint32_t isCardBusy( void );
 static void awaitDataLineAvailable( void );
-static void awaitBufferReadReady( void );
+static uint32_t isBufferReadReady( void );
 static void clearBufferReadReady( void );
 static uint32_t isTransferComplete( void );
 static void resetMMCIDataLine( void );
 static void resetMMCICmdLine( void );
 static void awaitCommandLineAvailable( void );
 static uint32_t awaitCommandResponse( void );
-static void changeClockFrequency( uint16_t divider );
-static void clearIrStatus( void );
 static void awaitInternalClockStable( void );
+static uint32_t isCommandComplete( void );
+static uint32_t isCommandTimeout( void );
+static uint32_t isDataTimeout( void );
+static void clearCommandComplete( void );
+static void clearTransferComplete( void );
+static void clearInterruptBits( uint32_t bits );
+static void clearAllInterruptsStatus( void );
 
 // COMMANDS USED DURING INITIALZATION & IDENTIFICATION
 // NOTE: see page 60 of sd_card spec 2.0 for details on commands
 static uint32_t sendCmd0( void );
-static uint32_t sendCmd1( void );
 static uint32_t sendCmd2( void );
 static uint32_t sendCmd3( void );
 static uint32_t sendCmd5( void );
@@ -76,36 +77,37 @@ static uint32_t sendACmd51();
 
 // NOTE: omap35x.pdf page 3189
 
+// NOTE: this implementation will work for MMCHS1 only
 #define MMCHS1_ADDR			0x4809C000
 #define MMCHS2_ADDR			0x480B4000
 #define MMCHS3_ADDR			0x480AD000
 
 #define SELECTED_CHS		MMCHS1_ADDR
 
-#define MMCHS_SYSCONFIG( addr )		READ_REGISTER_OFFSET( addr, 0x010 ) 	// RW
-#define MMCHS_SYSSTATUS( addr )		READ_REGISTER_OFFSET( addr, 0x014 ) 	// R
-#define MMCHS_CSRE( addr )			READ_REGISTER_OFFSET( addr, 0x024 ) 	// RW
-#define MMCHS_SYSTEST( addr )		READ_REGISTER_OFFSET( addr, 0x028 ) 	// RW
-#define MMCHS_CON( addr )			READ_REGISTER_OFFSET( addr, 0x02C ) 	// RW
-#define MMCHS_PWCNT( addr )			READ_REGISTER_OFFSET( addr, 0x030 ) 	// RW
-#define MMCHS_BLK( addr )			READ_REGISTER_OFFSET( addr, 0x104 ) 	// RW
-#define MMCHS_ARG( addr )			READ_REGISTER_OFFSET( addr, 0x108 ) 	// RW
-#define MMCHS_CMD( addr )			READ_REGISTER_OFFSET( addr, 0x10C ) 	// RW
-#define MMCHS_RSP10( addr )			READ_REGISTER_OFFSET( addr, 0x110 ) 	// R
-#define MMCHS_RSP32( addr )			READ_REGISTER_OFFSET( addr, 0x114 ) 	// R
-#define MMCHS_RSP54( addr )			READ_REGISTER_OFFSET( addr, 0x118 ) 	// R
-#define MMCHS_RSP76( addr )			READ_REGISTER_OFFSET( addr, 0x11C ) 	// R
-#define MMCHS_DATA( addr )			READ_REGISTER_OFFSET( addr, 0x120 ) 	// RW
-#define MMCHS_PSTATE( addr )		READ_REGISTER_OFFSET( addr, 0x124 ) 	// R
-#define MMCHS_HCTL( addr )			READ_REGISTER_OFFSET( addr, 0x128 ) 	// RW
-#define MMCHS_SYSCTL( addr )		READ_REGISTER_OFFSET( addr, 0x12C ) 	// RW
-#define MMCHS_STAT( addr )			READ_REGISTER_OFFSET( addr, 0x130 ) 	// RW
-#define MMCHS_IE( addr )			READ_REGISTER_OFFSET( addr, 0x134 ) 	// RW
-#define MMCHS_ISE( addr )			READ_REGISTER_OFFSET( addr, 0x138 ) 	// RW
-#define MMCHS_AC12( addr )			READ_REGISTER_OFFSET( addr, 0x13C ) 	// R
-#define MMCHS_CAPA( addr )			READ_REGISTER_OFFSET( addr, 0x140 ) 	// RW
-#define MMCHS_CUR_CAPA( addr )		READ_REGISTER_OFFSET( addr, 0x148 ) 	// RW
-#define MMCHS_REV( addr )			READ_REGISTER_OFFSET( addr, 0x1FC ) 	// R
+#define MMCHS_SYSCONFIG		READ_REGISTER_OFFSET( SELECTED_CHS, 0x010 ) 	// RW
+#define MMCHS_SYSSTATUS		READ_REGISTER_OFFSET( SELECTED_CHS, 0x014 ) 	// R
+#define MMCHS_CSRE			READ_REGISTER_OFFSET( SELECTED_CHS, 0x024 ) 	// RW
+#define MMCHS_SYSTEST		READ_REGISTER_OFFSET( SELECTED_CHS, 0x028 ) 	// RW
+#define MMCHS_CON			READ_REGISTER_OFFSET( SELECTED_CHS, 0x02C ) 	// RW
+#define MMCHS_PWCNT			READ_REGISTER_OFFSET( SELECTED_CHS, 0x030 ) 	// RW
+#define MMCHS_BLK			READ_REGISTER_OFFSET( SELECTED_CHS, 0x104 ) 	// RW
+#define MMCHS_ARG			READ_REGISTER_OFFSET( SELECTED_CHS, 0x108 ) 	// RW
+#define MMCHS_CMD			READ_REGISTER_OFFSET( SELECTED_CHS, 0x10C ) 	// RW
+#define MMCHS_RSP10			READ_REGISTER_OFFSET( SELECTED_CHS, 0x110 ) 	// R
+#define MMCHS_RSP32			READ_REGISTER_OFFSET( SELECTED_CHS, 0x114 ) 	// R
+#define MMCHS_RSP54			READ_REGISTER_OFFSET( SELECTED_CHS, 0x118 ) 	// R
+#define MMCHS_RSP76			READ_REGISTER_OFFSET( SELECTED_CHS, 0x11C ) 	// R
+#define MMCHS_DATA			READ_REGISTER_OFFSET( SELECTED_CHS, 0x120 ) 	// RW
+#define MMCHS_PSTATE		READ_REGISTER_OFFSET( SELECTED_CHS, 0x124 ) 	// R
+#define MMCHS_HCTL			READ_REGISTER_OFFSET( SELECTED_CHS, 0x128 ) 	// RW
+#define MMCHS_SYSCTL		READ_REGISTER_OFFSET( SELECTED_CHS, 0x12C ) 	// RW
+#define MMCHS_STAT			READ_REGISTER_OFFSET( SELECTED_CHS, 0x130 ) 	// RW
+#define MMCHS_IE			READ_REGISTER_OFFSET( SELECTED_CHS, 0x134 ) 	// RW
+#define MMCHS_ISE			READ_REGISTER_OFFSET( SELECTED_CHS, 0x138 ) 	// RW
+#define MMCHS_AC12			READ_REGISTER_OFFSET( SELECTED_CHS, 0x13C ) 	// R
+#define MMCHS_CAPA			READ_REGISTER_OFFSET( SELECTED_CHS, 0x140 ) 	// RW
+#define MMCHS_CUR_CAPA		READ_REGISTER_OFFSET( SELECTED_CHS, 0x148 ) 	// RW
+#define MMCHS_REV			READ_REGISTER_OFFSET( SELECTED_CHS, 0x1FC ) 	// R
 
 #define MMCHS_SYSCONFIG_AUTOIDLE_BIT				0x1
 #define MMCHS_SYSCONFIG_SOFTRESET_BIT 				0x2
@@ -214,16 +216,16 @@ static uint32_t sendACmd51();
 #define CM_EN_MMCHS1_BIT			0x1000000
 /////////////////////////////////////////////////////////////////////////////////////////////
 
-// NOTE: see OMAP35x.pdf 3141  Relation Between Configuration and Name of Response Type
+/////////////////////////////////////////////////////////////////////////////////////////////
+#define SD_CARD_VERSION(sdcard)		((sdcard).raw_scr[0] & 0xF)
+#define SD_CARD_BUSWIDTH(sdcard)	(((sdcard).raw_scr[0] & 0xF00) >> 8)
 
-// NOTE: internal buffer consists of 2x512 blocks and allows ping pong reading/writing => two transfers
-// at the same time if one requests only blocks LE 512 => hardcode block-size to 512
-#define BLOCK_LEN 		512
+#define SD_SWITCH_MODE        0x80FFFFFF
+#define SD_CMD6_GRP1_SEL      0xFFFFFFF0
+#define SD_CMD6_GRP1_HS       0x1
 
-// TODO: remove after test
-static uint8_t blockBuffer[ 1024 ];
-
-static CARD_INFO cardInfo;
+#define SD_TRANSPEED_25MBPS		(0x32u)
+#define SD_TRANSPEED_50MBPS		(0x5Au)
 
 #define SD_CARD_CSD_VERSION(crd) (((crd).raw_csd[3] & 0xC0000000) >> 30)
 
@@ -247,6 +249,19 @@ static CARD_INFO cardInfo;
 #define SD_CARD1_RDBLKLEN(crd) SD_CSD1_RDBLKLEN((crd).raw_csd[3], (crd).raw_csd[2], (crd).raw_csd[1], (crd).raw_csd[0])
 #define SD_CARD1_TRANSPEED(crd) SD_CSD1_TRANSPEED((crd).raw_csd[3], (crd).raw_csd[2], (crd).raw_csd[1], (crd).raw_csd[0])
 #define SD_CARD1_SIZE(crd) ((SD_CARD1_DEV_SIZE((crd)) + 1) * (512 * 1024))
+/////////////////////////////////////////////////////////////////////////////////////////////
+
+// NOTE: see OMAP35x.pdf 3141  Relation Between Configuration and Name of Response Type
+
+// NOTE: internal buffer consists of 2x512 blocks and allows ping pong reading/writing => two transfers
+// at the same time if one requests only blocks LE 512 => hardcode block-size to 512
+#define BLOCK_LEN 		512
+
+// TODO: remove after test
+static uint8_t blockBuffer[ 1024 ];
+
+static CARD_INFO cardInfo;
+
 
 uint32_t
 sdHalInit()
@@ -256,8 +271,6 @@ sdHalInit()
 	enableIfaceAndFunctionalClock();
 
 	softwareReset();
-
-	// NOTE: this flow follows HSMMCSDControllerInit from starterware
 
 	resetLines( MMCHS_SYSCTL_SRA_BIT );
 
@@ -272,19 +285,13 @@ sdHalInit()
 	setBusPower( TRUE );
 
 	// need some initial clock divider otherwise would not work to set the bus frequency
-	MMCHS_SYSCTL( SELECTED_CHS ) = 0x0000a007;
+	MMCHS_SYSCTL = 0x0000a007;
 
 	if ( setBusFrequency( SDMMC_CONTROLLER_CLOCK, SDMMC_BUS_CLOCK, FALSE ) )
 	{
 		return 1;
 	}
 
-	// NOTE: the initializatino follows the programming flow from OMAP35x.pdf at page 3177
-	/*
-	defaultInit();
-	initProcedureStart();
-	preCardIdentificationConfig();
-*/
 	sendInitStream();
 
 	identifyCard();
@@ -327,16 +334,16 @@ softwareReset( void )
 	// NOTE: see OMAP35x.pdf page 3160f and at page 3178
 
 	// 1. trigger module reset
-	BIT_SET( MMCHS_SYSCONFIG( SELECTED_CHS ), MMCHS_SYSCONFIG_SOFTRESET_BIT );
+	BIT_SET( MMCHS_SYSCONFIG, MMCHS_SYSCONFIG_SOFTRESET_BIT );
 	// 2. await finishing of module reset
-	AWAIT_BITS_SET( MMCHS_SYSSTATUS( SELECTED_CHS ), MMCHS_SYSSTATUS_RESETDONE_BIT );
+	AWAIT_BITS_SET( MMCHS_SYSSTATUS, MMCHS_SYSSTATUS_RESETDONE_BIT );
 }
 
 void
 resetLines( uint32_t lines )
 {
-	BIT_SET( MMCHS_SYSCTL( SELECTED_CHS ), lines );
-	AWAIT_BITS_CLEARED( MMCHS_SYSCTL( SELECTED_CHS ), lines );
+	BIT_SET( MMCHS_SYSCTL, lines );
+	AWAIT_BITS_CLEARED( MMCHS_SYSCTL, lines );
 }
 
 void
@@ -344,46 +351,48 @@ selectSupportedVoltage( uint32_t voltage )
 {
 	// NOTE: see OMAP35x.pdf page 3160f and at page 3178
 
-	BIT_CLEAR( MMCHS_CAPA( SELECTED_CHS ), 0x7000000 );
-	BIT_SET( MMCHS_CAPA( SELECTED_CHS ), voltage );
+	BIT_CLEAR( MMCHS_CAPA, 0x7000000 );
+	BIT_SET( MMCHS_CAPA, voltage );
 }
 
 void
 systemConfig( uint32_t flags )
 {
-	BIT_CLEAR( MMCHS_SYSCONFIG( SELECTED_CHS ), MMCHS_SYSCONFIG_AUTOIDLE_BIT |
+	BIT_CLEAR( MMCHS_SYSCONFIG, MMCHS_SYSCONFIG_AUTOIDLE_BIT |
 			MMCHS_SYSCONFIG_SOFTRESET_BIT |
 			MMCHS_SYSCONFIG_ENAWAKEUP_BIT |
 			MMCHS_SYSCONFIG_SIDLE_BITS |
 			MMCHS_SYSCONFIG_CLCKACT_BITS );
 
-	BIT_SET( MMCHS_SYSCONFIG( SELECTED_CHS ), flags );
+	BIT_SET( MMCHS_SYSCONFIG, flags );
 }
 
 void
 setBusWidth( uint32_t busWidth )
 {
-	 if ( BUS_WIDTH_8BIT == busWidth )
-	 {
-		 BIT_SET( MMCHS_CON( SELECTED_CHS ), MMCHS_CON_DW8_BIT );
-	 }
-	 else if ( BUS_WIDTH_4BIT == busWidth )
-	 {
-		 BIT_CLEAR( MMCHS_CON( SELECTED_CHS ), MMCHS_CON_DW8_BIT );
-		 BIT_SET( MMCHS_HCTL( SELECTED_CHS ), MMCHS_HCTL_DTW_BIT );
-	 }
-	 else if ( BUS_WIDTH_1BIT == busWidth )
-	 {
-		 BIT_CLEAR( MMCHS_CON( SELECTED_CHS ), MMCHS_CON_DW8_BIT );
-		 BIT_CLEAR( MMCHS_HCTL( SELECTED_CHS ), MMCHS_HCTL_DTW_BIT );
-	 }
+	// NOTE: MMCHS_CON is configured only here in this function, wont be set during sending a command
+
+	if ( BUS_WIDTH_8BIT == busWidth )
+	{
+		BIT_SET( MMCHS_CON, MMCHS_CON_DW8_BIT );
+	}
+	else if ( BUS_WIDTH_4BIT == busWidth )
+	{
+		BIT_CLEAR( MMCHS_CON, MMCHS_CON_DW8_BIT );
+		BIT_SET( MMCHS_HCTL, MMCHS_HCTL_DTW_BIT );
+	}
+	else if ( BUS_WIDTH_1BIT == busWidth )
+	{
+		BIT_CLEAR( MMCHS_CON, MMCHS_CON_DW8_BIT );
+		BIT_CLEAR( MMCHS_HCTL, MMCHS_HCTL_DTW_BIT );
+	}
 }
 
 void
 setBusVoltage( uint32_t voltage )
 {
-	BIT_CLEAR( MMCHS_HCTL( SELECTED_CHS ), MMCHS_HCTL_SDVS_33V_BIT );
-	BIT_SET( MMCHS_HCTL( SELECTED_CHS ), voltage );
+	BIT_CLEAR( MMCHS_HCTL, MMCHS_HCTL_SDVS_33V_BIT );
+	BIT_SET( MMCHS_HCTL, voltage );
 }
 
 void
@@ -391,12 +400,12 @@ setBusPower( bool enable )
 {
 	if ( enable )
 	{
-		BIT_SET( MMCHS_HCTL( SELECTED_CHS ), MMCHS_HCTL_SDBP_BIT );
-		AWAIT_BITS_SET( MMCHS_HCTL( SELECTED_CHS ), MMCHS_HCTL_SDBP_BIT );
+		BIT_SET( MMCHS_HCTL, MMCHS_HCTL_SDBP_BIT );
+		AWAIT_BITS_SET( MMCHS_HCTL, MMCHS_HCTL_SDBP_BIT );
 	}
 	else
 	{
-		BIT_CLEAR( MMCHS_HCTL( SELECTED_CHS ), MMCHS_HCTL_SDBP_BIT );
+		BIT_CLEAR( MMCHS_HCTL, MMCHS_HCTL_SDBP_BIT );
 	}
 }
 
@@ -429,14 +438,14 @@ setBusFrequency( uint32_t freq_in, uint32_t freq_out, bool bypass )
 		}
 
 		// NOTE: OMAP35x.pdf on page 3179 has a clock-divider of 240 which is the same as here
-        regVal = MMCHS_SYSCTL( SELECTED_CHS ) & ~0x0000FFC0u;
-        MMCHS_SYSCTL( SELECTED_CHS ) = regVal | ( clkd << 6 );
+        regVal = MMCHS_SYSCTL & ~0x0000FFC0u;
+        MMCHS_SYSCTL = regVal | ( clkd << 6 );
 
         /* Wait for the interface clock stabilization */
         awaitInternalClockStable();
 
         /* Enable clock to the card */
-        BIT_SET( MMCHS_SYSCTL( SELECTED_CHS ), MMCHS_SYSCTL_CEN_BIT );
+        BIT_SET( MMCHS_SYSCTL, MMCHS_SYSCTL_CEN_BIT );
     }
 
     return 0;
@@ -448,12 +457,12 @@ setInternalClock( bool enable )
 	if ( enable )
 	{
 		// await Internal clock stable
-		BIT_SET( MMCHS_SYSCTL( SELECTED_CHS ), MMCHS_SYSCTL_ICE_BIT );
+		BIT_SET( MMCHS_SYSCTL, MMCHS_SYSCTL_ICE_BIT );
 		awaitInternalClockStable();
 	}
 	else
 	{
-		BIT_CLEAR( MMCHS_SYSCTL( SELECTED_CHS ), MMCHS_SYSCTL_ICE_BIT );
+		BIT_CLEAR( MMCHS_SYSCTL, MMCHS_SYSCTL_ICE_BIT );
 	}
 }
 
@@ -461,10 +470,10 @@ void
 sendInitStream( void )
 {
 	/* Enable the command completion status to be set */
-	BIT_SET( MMCHS_IE( SELECTED_CHS ), MMCHS_IE_CC_BIT );
+	BIT_SET( MMCHS_IE, MMCHS_IE_CC_BIT );
 	 /* Initiate the INIT command */
-	BIT_SET( MMCHS_CON( SELECTED_CHS ), MMCHS_CON_INIT_BIT );
-	MMCHS_CMD( SELECTED_CHS ) = 0x0;
+	BIT_SET( MMCHS_CON, MMCHS_CON_INIT_BIT );
+	MMCHS_CMD = 0x0;
 
 	// TODO: wait until command is completed
 	// WAIT 1ms to allow card initializing internal state
@@ -472,59 +481,15 @@ sendInitStream( void )
 	while ( 1 > getSysMillis() - sysMillis ) { }
 
 	// end initialization sequence
-	BIT_CLEAR( MMCHS_CON( SELECTED_CHS ), MMCHS_CON_INIT_BIT );
+	BIT_CLEAR( MMCHS_CON, MMCHS_CON_INIT_BIT );
 	// clear all status
-	clearIrStatus();
+	clearAllInterruptsStatus();
 }
-
-void
-awaitInternalClockStable()
-{
-	AWAIT_BITS_SET( MMCHS_SYSCTL( SELECTED_CHS ), MMCHS_SYSCTL_ICS_BIT );
-}
-
-/*
-void
-defaultInit( void )
-{
-	// NOTE: see OMAP35x.pdf page 3178f
-
-	// NOTE: using magic numbers copied from manual because it would lead to contradicting values if following steps 1-6
-	MMCHS_HCTL( SELECTED_CHS ) = 0x00000b00;
-	MMCHS_SYSCTL( SELECTED_CHS ) = 0x0000a007;
-	MMCHS_CON( SELECTED_CHS ) = MMCHS_CON_OD_BIT;
-}
-
-void
-initProcedureStart( void )
-{
-	// NOTE: see OMAP35x.pdf page 3179
-
-	BIT_SET( MMCHS_CON( SELECTED_CHS ), MMCHS_CON_INIT_BIT );
-	MMCHS_CMD( SELECTED_CHS ) = 0x0;
-	READ_REGISTER( CONTROL_PADCONF_MMC1_ADDR ) = 0x100;
-}
-
-void
-preCardIdentificationConfig( void )
-{
-	// NOTE: see OMAP35x.pdf page 3179
-
-	MMCHS_HCTL( SELECTED_CHS ) = 0x00000b00;
-	MMCHS_SYSCTL( SELECTED_CHS ) = 0x00003C07;
-	MMCHS_CON( SELECTED_CHS ) = MMCHS_CON_OD_BIT;
-}
-*/
 
 uint32_t
 identifyCard( void )
 {
-	// NOTE: see OMAP35x.pdf page 3164
-	// NOTE: init stream was sent during initialization of controller
-
-	// NOTE: Change clock frequency to fit protocol
-	// TODO: NOTE: SD spec 2.0 page 24: During the card identification process, the card shall operate in the SD clock frequency of the identification clock rate fOD (see Chapter 6.7).
-	// changeClockFrequency( 1 );
+	// NOTE: see OMAP35x.pdf page 3164, starterware and sd_spec 2.0
 
 	uint8_t hcsFlag = 0;
 
@@ -540,7 +505,6 @@ identifyCard( void )
 	// cmd5 is reserved for I/O cards: SDIO. will return 0 if it is SDIO
 	if ( 0 == sendCmd5() )
 	{
-		// TODO handle problem: we don't do SDIO for now
 		return 1;
 	}
 
@@ -556,7 +520,7 @@ identifyCard( void )
 	{
 		// NOTE: it is an SD card compliant with standard 2.0 or later
 
-		uint32_t rsp0 = MMCHS_RSP10( SELECTED_CHS ) & 0x0000FFFF;
+		uint32_t rsp0 = MMCHS_RSP10 & 0x0000FFFF;
 		uint32_t supportedVoltage = rsp0 & 0xFFF;
 		if ( supportedVoltage != 0x1AA )
 		{
@@ -579,7 +543,7 @@ identifyCard( void )
 				// NOTE: it is a SD card compliant with standard 1.x
 
 				// store ocr in card-info
-				cardInfo.ocr = MMCHS_RSP10( SELECTED_CHS );
+				cardInfo.ocr = MMCHS_RSP10;
 				// check if card is high-capacity or not (HCR-bit in OCR at position 30)
 				cardInfo.highCap = ( cardInfo.ocr & ( 1 << 30 ) ) ? 1 : 0;
 
@@ -593,21 +557,8 @@ identifyCard( void )
 		}
 	}
 
-	// NOTE: at this point we are a MMC card
-	// TODO: we won't support MMC cards
-
+	// NOTE: at this point we are a MMC card - we don't support them
 	return 1;
-
-	do
-	{
-		// TODO: With OCR 0. In case of a CMD1 with OCR=0, a second CMD1 must be sent to the card with the "negociated" voltage.
-		if ( sendCmd1() )
-		{
-			// TODO: handle unknown type of card
-			return 1;
-		}
-
-	} while ( isCardBusy() );
 
 cardIdentified:
 	// send ALL_SEND_CID
@@ -617,10 +568,10 @@ cardIdentified:
 	}
 
 	// store card-info just returned by CMD2 in RSP10-76
-	cardInfo.raw_cid[ 0 ] = MMCHS_RSP10( SELECTED_CHS );
-	cardInfo.raw_cid[ 1 ] = MMCHS_RSP32( SELECTED_CHS );
-	cardInfo.raw_cid[ 2 ] = MMCHS_RSP54( SELECTED_CHS );
-	cardInfo.raw_cid[ 3 ] = MMCHS_RSP76( SELECTED_CHS );
+	cardInfo.raw_cid[ 0 ] = MMCHS_RSP10;
+	cardInfo.raw_cid[ 1 ] = MMCHS_RSP32;
+	cardInfo.raw_cid[ 2 ] = MMCHS_RSP54;
+	cardInfo.raw_cid[ 3 ] = MMCHS_RSP76;
 
 	// send SEND_RELATIVE_ADDR to ask card to publish new realtive address
 	if ( sendCmd3() )
@@ -629,7 +580,7 @@ cardIdentified:
 	}
 
 	// store RCA just returned by CMD3
-	cardInfo.rca = ( MMCHS_RSP10( SELECTED_CHS ) & 0xFFFF0000 ) >> 16;
+	cardInfo.rca = ( MMCHS_RSP10 & 0xFFFF0000 ) >> 16;
 
 	// send SEND_CSD: request card-specific data
 	if ( sendCmd9() )
@@ -638,10 +589,10 @@ cardIdentified:
 	}
 
 	// store card-specific data just returned by CMD9 in RSP10-76
-	cardInfo.raw_csd[ 0 ] = MMCHS_RSP10( SELECTED_CHS );
-	cardInfo.raw_csd[ 1 ] = MMCHS_RSP32( SELECTED_CHS );
-	cardInfo.raw_csd[ 2 ] = MMCHS_RSP54( SELECTED_CHS );
-	cardInfo.raw_csd[ 3 ] = MMCHS_RSP76( SELECTED_CHS );
+	cardInfo.raw_csd[ 0 ] = MMCHS_RSP10;
+	cardInfo.raw_csd[ 1 ] = MMCHS_RSP32;
+	cardInfo.raw_csd[ 2 ] = MMCHS_RSP54;
+	cardInfo.raw_csd[ 3 ] = MMCHS_RSP76;
 
 	if ( SD_CARD_CSD_VERSION( cardInfo ) )
 	{
@@ -658,7 +609,7 @@ cardIdentified:
 		cardInfo.size = SD_CARD0_SIZE(cardInfo);
 	}
 
-	// send SELECT/DESELECT_CARD to select card
+	// send SELECT/DESELECT_CARD to select card - now in transfer mode
 	if ( sendCmd7() )
 	{
 		return 1;
@@ -677,7 +628,6 @@ cardIdentified:
 		}
 	}
 
-	/*
 	if ( sendACmd51() )
 	{
 		return 1;
@@ -688,158 +638,13 @@ cardIdentified:
 
 	readTransferBuffer( 8, scrBuffer );
 
-	// TODO: read scr
+	cardInfo.raw_scr[0] = (scrBuffer[3] << 24) | (scrBuffer[2] << 16) | \
+		                   (scrBuffer[1] << 8) | (scrBuffer[0]);
+	cardInfo.raw_scr[1] = (scrBuffer[7] << 24) | (scrBuffer[6] << 16) | \
+                                   (scrBuffer[5] << 8) | (scrBuffer[4]);
 
-	card->raw_scr[0] = (dataBuffer[3] << 24) | (dataBuffer[2] << 16) | \
-		                   (dataBuffer[1] << 8) | (dataBuffer[0]);
-        card->raw_scr[1] = (dataBuffer[7] << 24) | (dataBuffer[6] << 16) | \
-                                   (dataBuffer[5] << 8) | (dataBuffer[4]);
-
-        card->sd_ver = SD_CARD_VERSION(card);
-        card->busWidth = SD_CARD_BUSWIDTH(card);
-*/
-
-	return 0;
-}
-
-uint32_t
-configBusWidth()
-{
-	uint8_t selectedBusWidth = 2;
-
-	/* TODO: after scr is available
-	if ( cardInfo.busWidth & SD_BUS_WIDTH_4BIT )
-	{
-		if ( cardInfo.busWidth & SD_BUS_WIDTH_4BIT )
-		{
-			selectedBusWidth = 0x2;
-		}
-	}
-*/
-
-	if ( sendACmd6( selectedBusWidth ) )
-	{
-		return 1;
-	}
-
-	if ( 0 == selectedBusWidth )
-	{
-		setBusWidth( BUS_WIDTH_1BIT );
-	}
-	else
-	{
-		setBusWidth( BUS_WIDTH_4BIT );
-	}
-
-	return 0;
-}
-
-#define SD_SWITCH_MODE        0x80FFFFFF
-#define SD_CMD6_GRP1_SEL      0xFFFFFFF0
-#define SD_CMD6_GRP1_HS       0x1
-
-#define SD_TRANSPEED_25MBPS		(0x32u)
-#define SD_TRANSPEED_50MBPS		(0x5Au)
-
-
-uint32_t
-configTransferSpeed()
-{
-	uint32_t arg = ((SD_SWITCH_MODE & SD_CMD6_GRP1_SEL) | (SD_CMD6_GRP1_HS));
-
-	if ( sendCmd6( arg ) )
-	{
-		return 1;
-	}
-
-	uint8_t scrBuffer[ 64 ];
-	memset( scrBuffer, 0, 64 );
-
-	if ( readTransferBuffer( 64, scrBuffer ) )
-	{
-		return 1;
-	}
-
-	uint32_t speed = cardInfo.tranSpeed;
-
-	if ((scrBuffer[16] & 0xF) == SD_CMD6_GRP1_HS)
-	{
-		cardInfo.tranSpeed = SD_TRANSPEED_50MBPS;
-	}
-
-	if (speed == SD_TRANSPEED_50MBPS)
-	{
-		if ( setBusFrequency( SDMMC_CONTROLLER_CLOCK, 50000000, FALSE ) )
-		{
-			return 1;
-		}
-	}
-	else
-	{
-		if ( setBusFrequency( SDMMC_CONTROLLER_CLOCK, 25000000, FALSE ) )
-		{
-			return 1;
-		}
-	}
-
-	return 0;
-}
-
-uint32_t
-readTransferBuffer( uint32_t nBytes, uint8_t* buffer )
-{
-	uint32_t i = 0;
-
-	// await buffer-ready interrupt-flag set: will be signaled when MMCi.MMCHS_PSTATE[11] BRE is set.
-	// if MMCHS_DATA is accessed before, this will lead to a  bad access (MMCi.MMCHS_STAT[29] BADA)
-	awaitBufferReadReady();
-
-	// clearBufferReadReady();
-
-	for ( i = 0; i < nBytes; i += 4 )
-	{
-		// NOTE: read 4bytes of data from data-address, will be moved by controller automatically
-		volatile uint32_t data = MMCHS_DATA( SELECTED_CHS );
-
-		buffer[ i + 0 ] = 0xFF & ( data >> 0 );
-		buffer[ i + 1 ] = 0xFF & ( data >> 8 );
-		buffer[ i + 2 ] = 0xFF & ( data >> 16 );
-		buffer[ i + 3 ] = 0xFF & ( data >> 24 );
-	}
-
-	// TODO: if Auto CMD12 is enabled (MMCi.MMCHS_CMD[2] ACEN bit to 0x1) then nothing has to be done, otherwise CMD12 needs to be sent now
-
-checkTransferComplete:
-	// NOTE: for dependencies between error flags and transfer complete in MMCHS_STAT see page 3157
-	if ( isTransferComplete() )
-	{
-		// TODO: need to distinguish between finite and infinite transfer
-		// TODO: when finite: END
-
-		// NOTE: TC is set upon DEB & DCRC => need to check anyway for those errors if transfer has completed
-		if ( BIT_CHECK( MMCHS_STAT( SELECTED_CHS ), MMCHS_STAT_DEB_BIT ) ||
-				BIT_CHECK( MMCHS_STAT( SELECTED_CHS ), MMCHS_STAT_DCRC_BIT ) )
-		{
-			// finished with an error
-			resetMMCIDataLine();
-			return 1;
-		}
-	}
-	else
-	{
-		// NOTE: DTO and TC are mutually exclusive, DCRC & DEB cannot occur with DTO
-		if ( BIT_CHECK( MMCHS_STAT( SELECTED_CHS ), MMCHS_STAT_DTO_BIT ) )
-		{
-			// finished with an error
-			resetMMCIDataLine();
-			return 1;
-		}
-		else
-		{
-			// no error occured and transfer not yet completed -> check again if transfer complete
-			goto checkTransferComplete;
-		}
-	}
+	cardInfo.sd_ver = SD_CARD_VERSION( cardInfo );
+	cardInfo.busWidth = SD_CARD_BUSWIDTH( cardInfo );
 
 	return 0;
 }
@@ -885,6 +690,9 @@ readBlocks( uint32_t block, uint32_t nblk, uint8_t* buffer )
 
 	uint32_t nBytes = nblk * BLOCK_LEN;
 
+	// TODO: receiving DTO - most probably because of misconfigured buswidth/transferspeed
+	// TODO: set another data-timeout value
+
 	if ( readTransferBuffer( nBytes, buffer ) )
 	{
 		return 1;
@@ -895,6 +703,149 @@ readBlocks( uint32_t block, uint32_t nblk, uint8_t* buffer )
 }
 
 uint32_t
+configBusWidth()
+{
+	uint8_t selectedBusWidth = 0x0;
+
+	if ( cardInfo.busWidth & BUS_WIDTH_4BIT )
+	{
+		if ( cardInfo.busWidth & BUS_WIDTH_4BIT )
+		{
+			selectedBusWidth = 0x2;
+		}
+	}
+
+	if ( sendACmd6( selectedBusWidth ) )
+	{
+		return 1;
+	}
+
+	if ( 0 == selectedBusWidth )
+	{
+		setBusWidth( BUS_WIDTH_1BIT );
+	}
+	else
+	{
+		setBusWidth( BUS_WIDTH_4BIT );
+	}
+
+	return 0;
+}
+
+uint32_t
+configTransferSpeed()
+{
+	uint32_t arg = ((SD_SWITCH_MODE & SD_CMD6_GRP1_SEL) | (SD_CMD6_GRP1_HS));
+
+	if ( sendCmd6( arg ) )
+	{
+		return 1;
+	}
+
+	uint8_t buffer[ 64 ];
+	memset( buffer, 0, 64 );
+
+	if ( readTransferBuffer( 64, buffer ) )
+	{
+		return 1;
+	}
+
+	uint32_t speed = cardInfo.tranSpeed;
+
+	if ((buffer[16] & 0xF) == SD_CMD6_GRP1_HS)
+	{
+		cardInfo.tranSpeed = SD_TRANSPEED_50MBPS;
+	}
+
+	if ( cardInfo.tranSpeed == SD_TRANSPEED_50MBPS)
+	{
+		if ( setBusFrequency( SDMMC_CONTROLLER_CLOCK, 50000000, FALSE ) )
+		{
+			return 1;
+		}
+	}
+	else
+	{
+		if ( setBusFrequency( SDMMC_CONTROLLER_CLOCK, 25000000, FALSE ) )
+		{
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+uint32_t
+readTransferBuffer( uint32_t nBytes, uint8_t* buffer )
+{
+	uint32_t status = 0;
+
+	while ( 1 )
+	{
+		// await buffer-ready interrupt-flag set: will be signaled when MMCi.MMCHS_PSTATE[11] BRE is set.
+		// if MMCHS_DATA is accessed before, this will lead to a  bad access (MMCi.MMCHS_STAT[29] BADA)
+		if ( isBufferReadReady() )
+		{
+			uint32_t i = 0;
+
+			clearBufferReadReady();
+
+			for ( i = 0; i < nBytes; i += 4 )
+			{
+				// NOTE: read 4bytes of data from data-address, will be moved by controller automatically
+				volatile uint32_t data = MMCHS_DATA;
+
+				buffer[ i + 0 ] = 0xFF & ( data >> 0 );
+				buffer[ i + 1 ] = 0xFF & ( data >> 8 );
+				buffer[ i + 2 ] = 0xFF & ( data >> 16 );
+				buffer[ i + 3 ] = 0xFF & ( data >> 24 );
+			}
+		}
+
+		// TODO: if Auto CMD12 is enabled (MMCi.MMCHS_CMD[2] ACEN bit to 0x1) then nothing has to be done, otherwise CMD12 needs to be sent now
+
+		// NOTE: for dependencies between error flags and transfer complete in MMCHS_STAT see page 3157
+		if ( isTransferComplete() )
+		{
+			clearTransferComplete();
+
+			// NOTE: TC is set upon DEB & DCRC => need to check anyway for those errors if transfer has completed
+			if ( BIT_CHECK( MMCHS_STAT, MMCHS_STAT_DEB_BIT ) ||
+					BIT_CHECK( MMCHS_STAT, MMCHS_STAT_DCRC_BIT ) )
+			{
+				clearInterruptBits( MMCHS_STAT_DEB_BIT | MMCHS_STAT_DCRC_BIT );
+
+				// finished with an error
+				resetMMCIDataLine();
+				status = 1;
+				break;
+			}
+
+			break;
+		}
+		else
+		{
+			// NOTE: DTO and TC are mutually exclusive, DCRC & DEB cannot occur with DTO
+			if ( isDataTimeout() )
+			{
+				clearInterruptBits( MMCHS_STAT_DTO_BIT );
+
+				// finished with an error
+				resetMMCIDataLine();
+				status = 1;
+				break;
+			}
+			else
+			{
+				// buffer not ready to read / no error occured / transfer not yet completed -> check again
+			}
+		}
+	}
+
+	return status;
+}
+
+uint32_t
 awaitCommandResponse()
 {
 	// NOTE: for dependencies between error flags and command complete in MMCHS_STAT see page 3157f
@@ -902,13 +853,15 @@ awaitCommandResponse()
 	while ( 1 )
 	{
 		// NOTE: CTO occured, is mutually exclusive with CC and the errors CIE, CEB and CERR cannot occur with CTO.
-		if ( BIT_CHECK( MMCHS_STAT( SELECTED_CHS ), MMCHS_STAT_CTO_BIT ) )
+		if ( isCommandTimeout() )
 		{
 			// NOTE: CTO can occur at the same time as CCRC: it indicates a command abort due to a contention on CMD line. In this case no CC appears.
-			if ( BIT_CHECK( MMCHS_STAT( SELECTED_CHS ), MMCHS_STAT_CCRC_BIT ) )
+			if ( BIT_CHECK( MMCHS_STAT, MMCHS_STAT_CCRC_BIT ) )
 			{
 				// NOTE: fuck it, don't care for this type of error
 			}
+
+			clearInterruptBits( MMCHS_STAT_CTO_BIT | MMCHS_STAT_CCRC_BIT );
 
 			// always need to reset CMD line after error
 			resetMMCICmdLine();
@@ -916,42 +869,22 @@ awaitCommandResponse()
 			return 1;
 		}
 		// command complete
-		else if ( BIT_CHECK( MMCHS_STAT( SELECTED_CHS ), MMCHS_STAT_CC_BIT ) )
+		else if ( isCommandComplete() )
 		{
+			clearCommandComplete();
+
 			// NOTE: CC is set upon CIE, CEB, CCRC (if no CTO) and CERR => need to check for those errors anyway although command has completed
-			if ( BIT_CHECK( MMCHS_STAT( SELECTED_CHS ), MMCHS_STAT_CIE_BIT ) ||
-					BIT_CHECK( MMCHS_STAT( SELECTED_CHS ), MMCHS_STAT_CEB_BIT ) ||
-					BIT_CHECK( MMCHS_STAT( SELECTED_CHS ), MMCHS_STAT_CCRC_BIT ) ||
-					BIT_CHECK( MMCHS_STAT( SELECTED_CHS ), MMCHS_STAT_CERR_BIT ) )
+			if ( BIT_CHECK( MMCHS_STAT, MMCHS_STAT_CIE_BIT ) ||
+					BIT_CHECK( MMCHS_STAT, MMCHS_STAT_CEB_BIT ) ||
+					BIT_CHECK( MMCHS_STAT, MMCHS_STAT_CCRC_BIT ) ||
+					BIT_CHECK( MMCHS_STAT, MMCHS_STAT_CERR_BIT ) )
 			{
+				clearInterruptBits( MMCHS_STAT_CIE_BIT | MMCHS_STAT_CEB_BIT | MMCHS_STAT_CCRC_BIT | MMCHS_STAT_CERR_BIT );
+
 				// Command index error / Command end bit error / Command CRC Error /  Card error ?
 				// return 1 to indicate failure
 				return 1;
 			}
-
-			/*
-			// check if a response is waiting
-			if ( BIT_CHECK( MMCHS_CMD( SELECTED_CHS ), MMCHS_CMD_RSP_TYPE_48BUSY_BIT ) )
-			{
-				// a response is waiting
-
-				// NOTE: kind of responses OMAP35x.pdf 3157
-				// R1, R1b (normal response), R3, R4, RESP[39:8](1) MMCHS_RSP10[31:0]R5, R5b, R6
-				// R1b (Auto CMD12 response) RESP[39:8](1) MMCHS_RSP76[31:0]
-				// R2 RESP[127:0](1): MMCHS_RSP76, MMCHS_RSP54, MMCHS_RSP32, MMCHS_RSP10 (all bits)
-
-				uint32_t rsp0 = MMCHS_RSP10( SELECTED_CHS ) & 0x0000FFFF;
-				uint32_t rsp1 = MMCHS_RSP10( SELECTED_CHS ) >> 16;
-				uint32_t rsp2 = MMCHS_RSP32( SELECTED_CHS ) & 0x0000FFFF;
-				uint32_t rsp3 = MMCHS_RSP32( SELECTED_CHS ) >> 16;
-				uint32_t rsp4 = MMCHS_RSP54( SELECTED_CHS ) & 0x0000FFFF;
-				uint32_t rsp5 = MMCHS_RSP54( SELECTED_CHS ) >> 16;
-				uint32_t rsp6 = MMCHS_RSP76( SELECTED_CHS ) & 0x0000FFFF;
-				uint32_t rsp7 = MMCHS_RSP76( SELECTED_CHS ) >> 16;
-
-				// TODO: handle responses
-			}
-			*/
 
 			return 0;
 		}
@@ -963,62 +896,103 @@ awaitCommandResponse()
 }
 
 void
+awaitInternalClockStable()
+{
+	AWAIT_BITS_SET( MMCHS_SYSCTL, MMCHS_SYSCTL_ICS_BIT );
+}
+
+void
 resetMMCIDataLine( void )
 {
-	BIT_SET( MMCHS_SYSCTL( SELECTED_CHS ), MMCHS_SYSCTL_SRD_BIT );
-	AWAIT_BITS_CLEARED( MMCHS_SYSCTL( SELECTED_CHS ), MMCHS_SYSCTL_SRD_BIT );
+	BIT_SET( MMCHS_SYSCTL, MMCHS_SYSCTL_SRD_BIT );
+	AWAIT_BITS_CLEARED( MMCHS_SYSCTL, MMCHS_SYSCTL_SRD_BIT );
 }
 
 void
 resetMMCICmdLine( void )
 {
-	BIT_SET( MMCHS_SYSCTL( SELECTED_CHS ), MMCHS_SYSCTL_SRC_BIT );
-	AWAIT_BITS_CLEARED( MMCHS_SYSCTL( SELECTED_CHS ), MMCHS_SYSCTL_SRC_BIT );
+	BIT_SET( MMCHS_SYSCTL, MMCHS_SYSCTL_SRC_BIT );
+	AWAIT_BITS_CLEARED( MMCHS_SYSCTL, MMCHS_SYSCTL_SRC_BIT );
+}
+
+uint32_t
+isCommandComplete( void )
+{
+	return BIT_CHECK( MMCHS_STAT, MMCHS_STAT_CC_BIT );
+}
+
+uint32_t
+isCommandTimeout( void )
+{
+	return BIT_CHECK( MMCHS_STAT, MMCHS_STAT_CTO_BIT );
 }
 
 uint32_t
 isTransferComplete( void )
 {
-	return BIT_CHECK( MMCHS_STAT( SELECTED_CHS ), MMCHS_STAT_TC_BIT );
+	return BIT_CHECK( MMCHS_STAT, MMCHS_STAT_TC_BIT );
 }
 
-void
-awaitBufferReadReady( void )
+uint32_t
+isDataTimeout( void )
 {
-	AWAIT_BITS_SET( MMCHS_STAT( SELECTED_CHS ), MMCHS_STAT_BRR_BIT );
+	return BIT_CHECK( MMCHS_STAT, MMCHS_STAT_DTO_BIT );
 }
 
-void
-clearBufferReadReady( void )
+uint32_t
+isBufferReadReady( void )
 {
-	BIT_CLEAR( MMCHS_STAT( SELECTED_CHS ), MMCHS_STAT_BRR_BIT );
-	AWAIT_BITS_CLEARED( MMCHS_STAT( SELECTED_CHS ), MMCHS_STAT_BRR_BIT );
+	return BIT_CHECK( MMCHS_STAT, MMCHS_STAT_BRR_BIT );
 }
 
 void
 awaitDataLineAvailable( void )
 {
 	// NOTE: if bit 1 (DATI) of MMCHS_PSTATE is 1 data-lines are busy
-	AWAIT_BITS_CLEARED( MMCHS_PSTATE( SELECTED_CHS ), MMCHS_PSTATE_DATI_BIT );
+	AWAIT_BITS_CLEARED( MMCHS_PSTATE, MMCHS_PSTATE_DATI_BIT );
 }
 
 void
 awaitCommandLineAvailable( void )
 {
-	AWAIT_BITS_CLEARED( MMCHS_PSTATE( SELECTED_CHS ), MMCHS_PSTATE_CMDI_BIT );
+	AWAIT_BITS_CLEARED( MMCHS_PSTATE, MMCHS_PSTATE_CMDI_BIT );
 }
 
 void
-clearIrStatus( void )
+clearAllInterruptsStatus( void )
 {
 	// clear all interrupts by writing 1 to every bit in STAT-register
-	MMCHS_STAT( SELECTED_CHS ) = 0xFFFFFFFF;
+	MMCHS_STAT = 0xFFFFFFFF;
+}
+
+void
+clearBufferReadReady( void )
+{
+	MMCHS_STAT = MMCHS_STAT_BRR_BIT;
+}
+
+void
+clearCommandComplete( void )
+{
+	MMCHS_STAT = MMCHS_STAT_CC_BIT;
+}
+
+void
+clearTransferComplete( void )
+{
+	MMCHS_STAT = MMCHS_STAT_TC_BIT;
+}
+
+void
+clearInterruptBits( uint32_t bits )
+{
+	MMCHS_STAT = bits;
 }
 
 uint32_t
 isCardBusy()
 {
-	uint32_t busyBit = BIT_CHECK( MMCHS_RSP10( SELECTED_CHS ), MMCHS_RSP10_BUSY_BIT );
+	uint32_t busyBit = BIT_CHECK( MMCHS_RSP10, MMCHS_RSP10_BUSY_BIT );
 	uint32_t busyFlag = busyBit == 0;
 
 	// NOTE: if bit 31 of RSP10 is 0 then card is busy
@@ -1035,30 +1009,9 @@ uint32_t
 sendCmd0( void )
 {
 	// NOTE: this command resets the MMC card (see OMAP35x.pdf page 3180)
-	clearIrStatus();
 
-	MMCHS_CON( SELECTED_CHS ) = MMCHS_CON_OD_BIT;
-	MMCHS_IE( SELECTED_CHS ) = MMCHS_IE_CC_BIT | MMCHS_IE_CEB_BIT;
-	MMCHS_CMD( SELECTED_CHS ) = MMCHS_CMD_INDX_BITS( 0 );
-
-	return awaitCommandResponse();
-}
-
-/* NOTE: reserved for MMC cards only
- */
-uint32_t
-sendCmd1( void )
-{
-	// TODO: implement NOTE, see spec for details
-	// NOTE: Once the card response is available in register MMCHS1.MMCHS_RSP10, the software is responsible to
-	//			compare Card OCR and Host OCR, and then send a second CMD1 command with the cross-checked
-	//			OCR (see OMAP35x.pdf page 3181 )
-
-	clearIrStatus();
-
-	MMCHS_CON( SELECTED_CHS ) = MMCHS_CON_OD_BIT;
-	MMCHS_IE( SELECTED_CHS ) = MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CEB_BIT;
-	MMCHS_CMD( SELECTED_CHS ) =  MMCHS_CMD_INDX_BITS( 1 ) | MMCHS_CMD_RSP_TYPE_48_BIT; //0x01020000;
+	MMCHS_IE = MMCHS_IE_CC_BIT | MMCHS_IE_CEB_BIT;
+	MMCHS_CMD = MMCHS_CMD_INDX_BITS( 0 );
 
 	return awaitCommandResponse();
 }
@@ -1074,11 +1027,8 @@ sendCmd2( void )
 {
 	// NOTE: This command asks the MMC card to send its CID register's content (see OMAP35x.pdf page 3182)
 
-	clearIrStatus();
-
-	MMCHS_CON( SELECTED_CHS ) = MMCHS_CON_OD_BIT;
-	MMCHS_IE( SELECTED_CHS ) =  MMCHS_IE_CCRC_BIT | MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CEB_BIT;
-	MMCHS_CMD( SELECTED_CHS ) = MMCHS_CMD_INDX_BITS( 2 ) | MMCHS_CMD_RSP_TYPE_136_BIT | MMCHS_CMD_CCCE_BIT;
+	MMCHS_IE =  MMCHS_IE_CCRC_BIT | MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CEB_BIT;
+	MMCHS_CMD = MMCHS_CMD_INDX_BITS( 2 ) | MMCHS_CMD_RSP_TYPE_136_BIT | MMCHS_CMD_CCCE_BIT;
 
 	return awaitCommandResponse();
 }
@@ -1094,12 +1044,9 @@ sendCmd3( void )
 {
 	// NOTE: This command sets MMC card address (see Table 22-19). Useful when MMCHS controller switches to addressed mode (see OMAP35x.pdf page 3182)
 
-	clearIrStatus();
-
-	MMCHS_CON( SELECTED_CHS ) = MMCHS_CON_OD_BIT;
-	MMCHS_IE( SELECTED_CHS ) = MMCHS_IE_CERR_BIT | MMCHS_IE_CIE_BIT | MMCHS_IE_CCRC_BIT | MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CEB_BIT;
-	MMCHS_ARG( SELECTED_CHS ) = 0x00010000; // TODO: make it nice: the MMC cards address
-	MMCHS_CMD( SELECTED_CHS ) =	MMCHS_CMD_INDX_BITS( 3 ) | MMCHS_CMD_RSP_TYPE_48_BIT | MMCHS_CMD_CICE_BIT | MMCHS_CMD_CCCE_BIT;
+	MMCHS_IE = MMCHS_IE_CERR_BIT | MMCHS_IE_CIE_BIT | MMCHS_IE_CCRC_BIT | MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CEB_BIT;
+	MMCHS_ARG = 0x00010000; // TODO: make it nice: the MMC cards address
+	MMCHS_CMD =	MMCHS_CMD_INDX_BITS( 3 ) | MMCHS_CMD_RSP_TYPE_48_BIT | MMCHS_CMD_CICE_BIT | MMCHS_CMD_CCCE_BIT;
 
 	return awaitCommandResponse();
 }
@@ -1109,12 +1056,9 @@ uint32_t
 sendCmd5( void )
 {
 	// NOTE: This command asks a SDIO card to send its operating conditions. This command will fail if there is no SDIO card (see OMAP35x.pdf page 3180)
-	clearIrStatus();
 
-	MMCHS_CON( SELECTED_CHS ) = MMCHS_CON_OD_BIT;
-	MMCHS_IE( SELECTED_CHS ) = MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CEB_BIT;
-	// NOTE: not interrupt-driven, polling for events MMCHS_ISE( SELECTED_CHS ) = 0x00050001;
-	MMCHS_CMD( SELECTED_CHS ) = MMCHS_CMD_INDX_BITS( 5 ) | MMCHS_CMD_RSP_TYPE_48_BIT;
+	MMCHS_IE = MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CEB_BIT;
+	MMCHS_CMD = MMCHS_CMD_INDX_BITS( 5 ) | MMCHS_CMD_RSP_TYPE_48_BIT;
 
 	return awaitCommandResponse();
 
@@ -1142,18 +1086,16 @@ sendCmd6( uint32_t arg )
 	// NOTE: Setting Data Bus Width to 8
 	// NOTE: see sd_spec 2.0 page 42: 4.3.10 Switch Function Command
 
-	clearIrStatus();
-
 	/*
-	MMCHS_CON( SELECTED_CHS ) = 0x00000000;
-	MMCHS_IE( SELECTED_CHS ) = MMCHS_IE_CERR_BIT | MMCHS_IE_CIE_BIT | MMCHS_IE_CCRC_BIT | MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CEB_BIT;
-	MMCHS_ARG( SELECTED_CHS ) = 0x03b70200; // (3 << 24) | (byte_address << 16) | (byte_value << 8). byte_address is the byte address in ext_csd register.
-	MMCHS_CMD( SELECTED_CHS ) = MMCHS_CMD_INDX_BITS( 6 ) | MMCHS_CMD_RSP_TYPE_48_BIT | MMCHS_CMD_CICE_BIT | MMCHS_CMD_CCCE_BIT;
+	MMCHS_CON = 0x00000000;
+	MMCHS_IE = MMCHS_IE_CERR_BIT | MMCHS_IE_CIE_BIT | MMCHS_IE_CCRC_BIT | MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CEB_BIT;
+	MMCHS_ARG = 0x03b70200; // (3 << 24) | (byte_address << 16) | (byte_value << 8). byte_address is the byte address in ext_csd register.
+	MMCHS_CMD = MMCHS_CMD_INDX_BITS( 6 ) | MMCHS_CMD_RSP_TYPE_48_BIT | MMCHS_CMD_CICE_BIT | MMCHS_CMD_CCCE_BIT;
 
 	After issuing CMD6 completes successfully and MMC card leaves busy state, MMCHS controller should
 	change its data bus width. This is done by changing MMCHS1.MMCHS_CON configuration value.
 
-	MMCHS_CON( SELECTED_CHS ) = 0x00000020; // TODO: wont it be overwritten?
+	MMCHS_CON = 0x00000020; // TODO: wont it be overwritten?
 
 	/*
 	 * After issuing CMD6 completes successfully and MMC card leaves busy state, MMCHS controller should
@@ -1161,13 +1103,12 @@ now change its output clock to bring it to 48 MHz. 52 MHz, max frequency value s
 version 4 and above, is not supported because 96 MHz, MMCHS controller functional clock, is not a
 multiple of 52 MHz. We fall off to 48 MHz.
 	 */
-	//MMCHS_SYSCTL( SELECTED_CHS ) = 0x00000087; // MMCHS controller's internal clock is stable and enabled, MMC card's clock is on. Divider value is 2 which means that MMCHS controller is supplying a 48 MHz clock.
+	//MMCHS_SYSCTL = 0x00000087; // MMCHS controller's internal clock is stable and enabled, MMC card's clock is on. Divider value is 2 which means that MMCHS controller is supplying a 48 MHz clock.
 
-	MMCHS_CON( SELECTED_CHS ) = MMCHS_CON_DW8_BIT;	// MMC bus is in push-pull mode. DW8 is enabled.
-	MMCHS_IE( SELECTED_CHS ) = MMCHS_IE_CERR_BIT | MMCHS_IE_CIE_BIT | MMCHS_IE_CCRC_BIT | MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CEB_BIT | MMCHS_IE_TC_BIT | MMCHS_IE_BRR_BIT | MMCHS_IE_DTO_BIT | MMCHS_IE_DCRC_BIT | MMCHS_IE_DEB_BIT;
-	MMCHS_ARG( SELECTED_CHS ) = arg;
-	MMCHS_BLK( SELECTED_CHS ) = ( 1 << 16 ) | ( BLOCK_LEN ); // read one block. starts at bit 16, bit 0-15 contains block-size and is ALWAYS set to 512
-	MMCHS_CMD( SELECTED_CHS ) = MMCHS_CMD_INDX_BITS( 6 ) | MMCHS_CMD_RSP_TYPE_48_BIT | MMCHS_CMD_CICE_BIT | MMCHS_CMD_DP_BIT | MMCHS_CMD_DDIR_BIT | MMCHS_CMD_CCCE_BIT;
+	MMCHS_IE = MMCHS_IE_CERR_BIT | MMCHS_IE_CIE_BIT | MMCHS_IE_CCRC_BIT | MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CEB_BIT | MMCHS_IE_TC_BIT | MMCHS_IE_BRR_BIT | MMCHS_IE_DTO_BIT | MMCHS_IE_DCRC_BIT | MMCHS_IE_DEB_BIT;
+	MMCHS_ARG = arg;
+	MMCHS_BLK = ( 1 << 16 ) | ( 64 ); // read one block. with length of 64 bytes, will contain
+	MMCHS_CMD = MMCHS_CMD_INDX_BITS( 6 ) | MMCHS_CMD_RSP_TYPE_48_BIT | MMCHS_CMD_CICE_BIT | MMCHS_CMD_DP_BIT | MMCHS_CMD_DDIR_BIT | MMCHS_CMD_CCCE_BIT;
 
 	return awaitCommandResponse();
 }
@@ -1188,18 +1129,9 @@ sendCmd7( void )
 {
 	// NOTE: see OMAP35x.pdf page 3184
 
-	clearIrStatus();
-
-	MMCHS_CON( SELECTED_CHS ) = 0x00000000;
-	MMCHS_IE( SELECTED_CHS ) = MMCHS_IE_CERR_BIT | MMCHS_IE_CIE_BIT | MMCHS_IE_CCRC_BIT | MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CEB_BIT;
-	MMCHS_ARG( SELECTED_CHS ) = cardInfo.rca << 16;
-	MMCHS_CMD( SELECTED_CHS ) = MMCHS_CMD_INDX_BITS( 7 ) | MMCHS_CMD_RSP_TYPE_48BUSY_BIT | MMCHS_CMD_CICE_BIT | MMCHS_CMD_CCCE_BIT;
-
-	/* TODO: After a CMD7 transfer is complete, the MMC card is ready to receive a CMD6 command. CMD6 command
-is used to write a byte in MMC card extended CSD register (ext_csd). It is an IO access function. There
-are two write actions, the first one enables a specific data bus width in the card. For our use case we used
-maximum data bus width 8. The second one enables high speed feature in the card.
-	*/
+	MMCHS_IE = MMCHS_IE_CERR_BIT | MMCHS_IE_CIE_BIT | MMCHS_IE_CCRC_BIT | MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CEB_BIT;
+	MMCHS_ARG = cardInfo.rca << 16;
+	MMCHS_CMD = MMCHS_CMD_INDX_BITS( 7 ) | MMCHS_CMD_RSP_TYPE_48BUSY_BIT | MMCHS_CMD_CICE_BIT | MMCHS_CMD_CCCE_BIT;
 
 	return awaitCommandResponse();
 }
@@ -1217,12 +1149,10 @@ sendCmd8( void )
 {
 	// NOTE: This command asks a SD card version 2.X to send its operating conditions (see OMAP35x.pdf page 3180f)
 	// NOTE: see sd_spec 2.0 page 51 4.3.13 Send Interface Condition Command (CMD8)
-	clearIrStatus();
 
-	MMCHS_CON( SELECTED_CHS ) = MMCHS_CON_OD_BIT;
-	MMCHS_IE( SELECTED_CHS ) = MMCHS_IE_CERR_BIT | MMCHS_IE_CIE_BIT | MMCHS_IE_CCRC_BIT | MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CEB_BIT;
-	MMCHS_ARG( SELECTED_CHS ) = CMD8_CHECK_PATTERN | CMD8_VOLT_2P7_3P6;
-	MMCHS_CMD( SELECTED_CHS ) = MMCHS_CMD_INDX_BITS( 8 ) | MMCHS_CMD_RSP_TYPE_48_BIT | MMCHS_CMD_CICE_BIT | MMCHS_CMD_CCCE_BIT;
+	MMCHS_IE = MMCHS_IE_CERR_BIT | MMCHS_IE_CIE_BIT | MMCHS_IE_CCRC_BIT | MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CEB_BIT;
+	MMCHS_ARG = CMD8_CHECK_PATTERN | CMD8_VOLT_2P7_3P6;
+	MMCHS_CMD = MMCHS_CMD_INDX_BITS( 8 ) | MMCHS_CMD_RSP_TYPE_48_BIT | MMCHS_CMD_CICE_BIT | MMCHS_CMD_CCCE_BIT;
 
 	return awaitCommandResponse();
 }
@@ -1239,12 +1169,9 @@ sendCmd9( void )
 {
 	// NOTE: This command asks the card to send its csd register's content
 
-	clearIrStatus();
-
-	MMCHS_CON( SELECTED_CHS ) = 0x00000000;
-	MMCHS_IE( SELECTED_CHS ) = MMCHS_IE_CCRC_BIT | MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CEB_BIT;
-	MMCHS_ARG( SELECTED_CHS ) = cardInfo.rca << 16;
-	MMCHS_CMD( SELECTED_CHS ) = MMCHS_CMD_INDX_BITS( 9 ) | MMCHS_CMD_RSP_TYPE_136_BIT | MMCHS_CMD_CCCE_BIT;
+	MMCHS_IE = MMCHS_IE_CCRC_BIT | MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CEB_BIT;
+	MMCHS_ARG = cardInfo.rca << 16;
+	MMCHS_CMD = MMCHS_CMD_INDX_BITS( 9 ) | MMCHS_CMD_RSP_TYPE_136_BIT | MMCHS_CMD_CCCE_BIT;
 
 	return awaitCommandResponse();
 }
@@ -1266,12 +1193,9 @@ sendCmd16()
 {
 	// NOTE: Issuing CMD16 allows to set the block length (see OMAP35x.pdf page 3186)
 
-	clearIrStatus();
-
-	MMCHS_CON( SELECTED_CHS ) = MMCHS_CON_DW8_BIT; // MMC bus is in push-pull mode. DW8 is enabled.
-	MMCHS_IE( SELECTED_CHS ) = MMCHS_IE_CERR_BIT | MMCHS_IE_CIE_BIT | MMCHS_IE_CCRC_BIT | MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CEB_BIT;
-	MMCHS_ARG( SELECTED_CHS ) = BLOCK_LEN;	// Block length is 512 = 0x200
-	MMCHS_CMD( SELECTED_CHS ) = MMCHS_CMD_INDX_BITS( 16 ) | MMCHS_CMD_RSP_TYPE_48_BIT | MMCHS_CMD_CICE_BIT | MMCHS_CMD_CCCE_BIT;
+	MMCHS_IE = MMCHS_IE_CERR_BIT | MMCHS_IE_CIE_BIT | MMCHS_IE_CCRC_BIT | MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CEB_BIT;
+	MMCHS_ARG = BLOCK_LEN;	// Block length is 512 = 0x200
+	MMCHS_CMD = MMCHS_CMD_INDX_BITS( 16 ) | MMCHS_CMD_RSP_TYPE_48_BIT | MMCHS_CMD_CICE_BIT | MMCHS_CMD_CCCE_BIT;
 
 	return awaitCommandResponse();
 }
@@ -1287,13 +1211,10 @@ sendCmd16()
 uint32_t
 sendCmd17( uint32_t addr )
 {
-	clearIrStatus();
-
-	MMCHS_CON( SELECTED_CHS ) = MMCHS_CON_DW8_BIT;	// MMC bus is in push-pull mode. DW8 is enabled.
-	MMCHS_IE( SELECTED_CHS ) = MMCHS_IE_CERR_BIT | MMCHS_IE_CIE_BIT | MMCHS_IE_CCRC_BIT | MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CEB_BIT | MMCHS_IE_TC_BIT | MMCHS_IE_BRR_BIT | MMCHS_IE_DTO_BIT | MMCHS_IE_DCRC_BIT | MMCHS_IE_DEB_BIT;
-	MMCHS_ARG( SELECTED_CHS ) = addr;	// address
-	MMCHS_BLK( SELECTED_CHS ) = ( 1 << 16 ) | ( BLOCK_LEN ); // read one block. starts at bit 16, bit 0-15 contains block-size and is ALWAYS set to 512
-	MMCHS_CMD( SELECTED_CHS ) = MMCHS_CMD_INDX_BITS( 17 ) | MMCHS_CMD_RSP_TYPE_48_BIT | MMCHS_CMD_CICE_BIT | MMCHS_CMD_DP_BIT | MMCHS_CMD_DDIR_BIT | MMCHS_CMD_CCCE_BIT /*| MMCHS_CMD_ACEN_BIT*/;
+	MMCHS_IE = MMCHS_IE_CERR_BIT | MMCHS_IE_CIE_BIT | MMCHS_IE_CCRC_BIT | MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CEB_BIT | MMCHS_IE_TC_BIT | MMCHS_IE_BRR_BIT | MMCHS_IE_DTO_BIT | MMCHS_IE_DCRC_BIT | MMCHS_IE_DEB_BIT;
+	MMCHS_ARG = addr;	// address
+	MMCHS_BLK = ( 1 << 16 ) | ( BLOCK_LEN ); // read one block. starts at bit 16, bit 0-15 contains block-size and is ALWAYS set to 512
+	MMCHS_CMD = MMCHS_CMD_INDX_BITS( 17 ) | MMCHS_CMD_RSP_TYPE_48_BIT | MMCHS_CMD_CICE_BIT | MMCHS_CMD_DP_BIT | MMCHS_CMD_DDIR_BIT | MMCHS_CMD_CCCE_BIT /*| MMCHS_CMD_ACEN_BIT*/;
 
 	return awaitCommandResponse();
 }
@@ -1312,13 +1233,10 @@ sendCmd18( uint32_t addr, uint32_t nblk )
 {
 	// NOTE: Issuing CMD18 starts the finite, multiple block read transfer. (see OMAP35x.pdf page 3187)
 
-	clearIrStatus();
-
-	MMCHS_CON( SELECTED_CHS ) = MMCHS_CON_DW8_BIT;	// MMC bus is in push-pull mode. DW8 is enabled.
-	MMCHS_IE( SELECTED_CHS ) = MMCHS_IE_CERR_BIT | MMCHS_IE_CIE_BIT | MMCHS_IE_CCRC_BIT | MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CEB_BIT | MMCHS_IE_TC_BIT | MMCHS_IE_BRR_BIT | MMCHS_IE_DTO_BIT | MMCHS_IE_DCRC_BIT | MMCHS_IE_DEB_BIT;
-	MMCHS_ARG( SELECTED_CHS ) = addr;	// address
-	MMCHS_BLK( SELECTED_CHS ) = ( nblk << 16 ) | ( BLOCK_LEN ); // write number of blocks/bytes to read. starts at bit 16, bit 0-15 contains block-size and is ALWAYS set to 512
-	MMCHS_CMD( SELECTED_CHS ) = MMCHS_CMD_INDX_BITS( 18 ) | MMCHS_CMD_RSP_TYPE_48_BIT | MMCHS_CMD_CICE_BIT | MMCHS_CMD_DP_BIT | MMCHS_CMD_MSBS_BIT | MMCHS_CMD_BCE_BIT /*| MMCHS_CMD_ACEN_BIT */ | MMCHS_CMD_DDIR_BIT | MMCHS_CMD_CCCE_BIT;
+	MMCHS_IE = MMCHS_IE_CERR_BIT | MMCHS_IE_CIE_BIT | MMCHS_IE_CCRC_BIT | MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CEB_BIT | MMCHS_IE_TC_BIT | MMCHS_IE_BRR_BIT | MMCHS_IE_DTO_BIT | MMCHS_IE_DCRC_BIT | MMCHS_IE_DEB_BIT;
+	MMCHS_ARG = addr;	// address
+	MMCHS_BLK = ( nblk << 16 ) | ( BLOCK_LEN ); // write number of blocks/bytes to read. starts at bit 16, bit 0-15 contains block-size and is ALWAYS set to 512
+	MMCHS_CMD = MMCHS_CMD_INDX_BITS( 18 ) | MMCHS_CMD_RSP_TYPE_48_BIT | MMCHS_CMD_CICE_BIT | MMCHS_CMD_DP_BIT | MMCHS_CMD_MSBS_BIT | MMCHS_CMD_BCE_BIT /*| MMCHS_CMD_ACEN_BIT */ | MMCHS_CMD_DDIR_BIT | MMCHS_CMD_CCCE_BIT;
 
 	return awaitCommandResponse();
 }
@@ -1340,12 +1258,9 @@ sendACmd6( uint8_t busWidth )
 		return 1;
 	}
 
-	clearIrStatus();
-
-	MMCHS_CON( SELECTED_CHS ) = MMCHS_CON_OD_BIT;
-	MMCHS_IE( SELECTED_CHS ) = MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CERR_BIT | MMCHS_IE_CIE_BIT | MMCHS_IE_CCRC_BIT | MMCHS_IE_CC_BIT | MMCHS_IE_CEB_BIT;
-	MMCHS_ARG( SELECTED_CHS ) = busWidth;
-	MMCHS_CMD( SELECTED_CHS ) = MMCHS_CMD_INDX_BITS( 6 ) | MMCHS_CMD_RSP_TYPE_48_BIT;
+	MMCHS_IE = MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CERR_BIT | MMCHS_IE_CIE_BIT | MMCHS_IE_CCRC_BIT | MMCHS_IE_CC_BIT | MMCHS_IE_CEB_BIT;
+	MMCHS_ARG = busWidth;
+	MMCHS_CMD = MMCHS_CMD_INDX_BITS( 6 ) | MMCHS_CMD_RSP_TYPE_48_BIT;
 
 	return awaitCommandResponse();
 }
@@ -1369,12 +1284,9 @@ sendACmd41( uint8_t hcsFlag )
 		return 1;
 	}
 
-	clearIrStatus();
-
-	MMCHS_CON( SELECTED_CHS ) = MMCHS_CON_OD_BIT;
-	MMCHS_IE( SELECTED_CHS ) = MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CERR_BIT | MMCHS_IE_CIE_BIT | MMCHS_IE_CCRC_BIT | MMCHS_IE_CC_BIT | MMCHS_IE_CEB_BIT;
-	MMCHS_ARG( SELECTED_CHS ) = hcsFlag << 30 | SD_OCR_VDD_WILDCARD; // NOTE: if sdcard 2.0 or later: If host supports high capacity, HCS is set to 1
-	MMCHS_CMD( SELECTED_CHS ) = MMCHS_CMD_INDX_BITS( 41 ) | MMCHS_CMD_RSP_TYPE_48_BIT;
+	MMCHS_IE = MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CERR_BIT | MMCHS_IE_CIE_BIT | MMCHS_IE_CCRC_BIT | MMCHS_IE_CC_BIT | MMCHS_IE_CEB_BIT;
+	MMCHS_ARG = hcsFlag << 30 | SD_OCR_VDD_WILDCARD; // NOTE: if sdcard 2.0 or later: If host supports high capacity, HCS is set to 1
+	MMCHS_CMD = MMCHS_CMD_INDX_BITS( 41 ) | MMCHS_CMD_RSP_TYPE_48_BIT;
 
 	return awaitCommandResponse();
 }
@@ -1396,13 +1308,10 @@ sendACmd51()
 		return 1;
 	}
 
-	clearIrStatus();
-
-	MMCHS_CON( SELECTED_CHS ) = MMCHS_CON_DW8_BIT;	// MMC bus is in push-pull mode. DW8 is enabled.
-	MMCHS_IE( SELECTED_CHS ) = MMCHS_IE_CERR_BIT | MMCHS_IE_CIE_BIT | MMCHS_IE_CCRC_BIT | MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CEB_BIT | MMCHS_IE_TC_BIT | MMCHS_IE_BRR_BIT | MMCHS_IE_DTO_BIT | MMCHS_IE_DCRC_BIT | MMCHS_IE_DEB_BIT;
-	MMCHS_ARG( SELECTED_CHS ) = cardInfo.rca << 16;
-	MMCHS_BLK( SELECTED_CHS ) = ( 1 << 16 ) | ( BLOCK_LEN ); // read one block. starts at bit 16, bit 0-15 contains block-size and is ALWAYS set to 512
-	MMCHS_CMD( SELECTED_CHS ) = MMCHS_CMD_INDX_BITS( 51 ) | MMCHS_CMD_RSP_TYPE_48_BIT | MMCHS_CMD_CICE_BIT | MMCHS_CMD_DP_BIT | MMCHS_CMD_DDIR_BIT | MMCHS_CMD_CCCE_BIT;
+	MMCHS_IE = MMCHS_IE_CERR_BIT | MMCHS_IE_CIE_BIT | MMCHS_IE_CCRC_BIT | MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CEB_BIT | MMCHS_IE_TC_BIT | MMCHS_IE_BRR_BIT | MMCHS_IE_DTO_BIT | MMCHS_IE_DCRC_BIT | MMCHS_IE_DEB_BIT;
+	MMCHS_ARG = cardInfo.rca << 16;
+	MMCHS_BLK = ( 1 << 16 ) | ( 8 ); // read one block, but only 8 bytes - response will contain SCR which is 8 bytes wide
+	MMCHS_CMD = MMCHS_CMD_INDX_BITS( 51 ) | MMCHS_CMD_RSP_TYPE_48_BIT | MMCHS_CMD_CICE_BIT | MMCHS_CMD_DP_BIT | MMCHS_CMD_DDIR_BIT | MMCHS_CMD_CCCE_BIT;
 
 	return awaitCommandResponse();
 }
@@ -1421,12 +1330,9 @@ sendCmd55( void )
 
 	// NOTE: see sd_card spec 2.0 page 40f: Application-Specific Command – APP_CMD (CMD55)
 
-	clearIrStatus();
-
-	MMCHS_CON( SELECTED_CHS ) = MMCHS_CON_OD_BIT;
-	MMCHS_IE( SELECTED_CHS ) = MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CERR_BIT | MMCHS_IE_CIE_BIT | MMCHS_IE_CCRC_BIT | MMCHS_IE_CEB_BIT;
-	MMCHS_ARG( SELECTED_CHS ) = cardInfo.rca << 16;
-	MMCHS_CMD( SELECTED_CHS ) = MMCHS_CMD_INDX_BITS( 55 ) | MMCHS_CMD_RSP_TYPE_48_BIT | MMCHS_CMD_CICE_BIT | MMCHS_CMD_CCCE_BIT;
+	MMCHS_IE = MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CERR_BIT | MMCHS_IE_CIE_BIT | MMCHS_IE_CCRC_BIT | MMCHS_IE_CEB_BIT;
+	MMCHS_ARG = cardInfo.rca << 16;
+	MMCHS_CMD = MMCHS_CMD_INDX_BITS( 55 ) | MMCHS_CMD_RSP_TYPE_48_BIT | MMCHS_CMD_CICE_BIT | MMCHS_CMD_CCCE_BIT;
 
 	return awaitCommandResponse();
 }

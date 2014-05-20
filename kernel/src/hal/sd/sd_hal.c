@@ -45,7 +45,6 @@ static void clearBufferReadReady( void );
 static uint32_t isTransferComplete( void );
 static void resetMMCIDataLine( void );
 static void resetMMCICmdLine( void );
-static void awaitCommandLineAvailable( void );
 static uint32_t awaitCommandResponse( void );
 static void awaitInternalClockStable( void );
 static uint32_t isCommandComplete( void );
@@ -55,6 +54,7 @@ static void clearCommandComplete( void );
 static void clearTransferComplete( void );
 static void clearInterruptBits( uint32_t bits );
 static void clearAllInterruptsStatus( void );
+static void setDataTimeout( uint32_t timeout );
 
 // COMMANDS USED DURING INITIALZATION & IDENTIFICATION
 // NOTE: see page 60 of sd_card spec 2.0 for details on commands
@@ -131,6 +131,8 @@ static uint32_t sendACmd51();
 #define MMCHS_SYSCTL_ICS_BIT 						0x2
 #define MMCHS_SYSCTL_CEN_BIT						0x4
 #define MMCHS_SYSCTL_CLKD_BIT						0x8000
+#define MMCHS_SYSCTL_DTO_MASK						0xF0000
+#define MMCHS_SYSCTL_DTO_BIT_INDEX					16
 #define MMCHS_SYSCTL_SRA_BIT 						0x1000000
 #define MMCHS_SYSCTL_SRC_BIT 						0x2000000
 #define MMCHS_SYSCTL_SRD_BIT 						0x4000000
@@ -690,9 +692,6 @@ readBlocks( uint32_t block, uint32_t nblk, uint8_t* buffer )
 
 	uint32_t nBytes = nblk * BLOCK_LEN;
 
-	// TODO: receiving DTO - most probably because of misconfigured buswidth/transferspeed
-	// TODO: set another data-timeout value
-
 	if ( readTransferBuffer( nBytes, buffer ) )
 	{
 		return 1;
@@ -757,7 +756,7 @@ configTransferSpeed()
 		cardInfo.tranSpeed = SD_TRANSPEED_50MBPS;
 	}
 
-	if ( cardInfo.tranSpeed == SD_TRANSPEED_50MBPS)
+	if ( speed == SD_TRANSPEED_50MBPS)
 	{
 		if ( setBusFrequency( SDMMC_CONTROLLER_CLOCK, 50000000, FALSE ) )
 		{
@@ -865,6 +864,8 @@ awaitCommandResponse()
 
 			// always need to reset CMD line after error
 			resetMMCICmdLine();
+			// reset DATA line after error occured during a command which transmits data
+			resetMMCIDataLine();
 			// return 1 to indicate failure
 			return 1;
 		}
@@ -953,12 +954,6 @@ awaitDataLineAvailable( void )
 }
 
 void
-awaitCommandLineAvailable( void )
-{
-	AWAIT_BITS_CLEARED( MMCHS_PSTATE, MMCHS_PSTATE_CMDI_BIT );
-}
-
-void
 clearAllInterruptsStatus( void )
 {
 	// clear all interrupts by writing 1 to every bit in STAT-register
@@ -987,6 +982,14 @@ void
 clearInterruptBits( uint32_t bits )
 {
 	MMCHS_STAT = bits;
+}
+
+// NOTE: timeout must be in range of 13 to 27
+void
+setDataTimeout( uint32_t timeout )
+{
+	BIT_CLEAR( MMCHS_SYSCTL, MMCHS_SYSCTL_DTO_MASK );
+	MMCHS_SYSCTL |= ((((timeout) - 13) & 0xF) << MMCHS_SYSCTL_DTO_BIT_INDEX);
 }
 
 uint32_t
@@ -1065,7 +1068,6 @@ sendCmd5( void )
 	// NOTE: In case of success the response will be in MMCHS1.MMCHS_RSP10 register
 }
 
-// TODO: use it
 /* NOTE: SWITCH_FUNC
  * Checks switchable function (mode 0) and switch card function (mode 1). See Chapter 4.3.10.
  *
@@ -1083,31 +1085,13 @@ sendCmd5( void )
 uint32_t
 sendCmd6( uint32_t arg )
 {
-	// NOTE: Setting Data Bus Width to 8
+	// NOTE: Setting Data Bus Width to arg
 	// NOTE: see sd_spec 2.0 page 42: 4.3.10 Switch Function Command
-
-	/*
-	MMCHS_CON = 0x00000000;
-	MMCHS_IE = MMCHS_IE_CERR_BIT | MMCHS_IE_CIE_BIT | MMCHS_IE_CCRC_BIT | MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CEB_BIT;
-	MMCHS_ARG = 0x03b70200; // (3 << 24) | (byte_address << 16) | (byte_value << 8). byte_address is the byte address in ext_csd register.
-	MMCHS_CMD = MMCHS_CMD_INDX_BITS( 6 ) | MMCHS_CMD_RSP_TYPE_48_BIT | MMCHS_CMD_CICE_BIT | MMCHS_CMD_CCCE_BIT;
-
-	After issuing CMD6 completes successfully and MMC card leaves busy state, MMCHS controller should
-	change its data bus width. This is done by changing MMCHS1.MMCHS_CON configuration value.
-
-	MMCHS_CON = 0x00000020; // TODO: wont it be overwritten?
-
-	/*
-	 * After issuing CMD6 completes successfully and MMC card leaves busy state, MMCHS controller should
-now change its output clock to bring it to 48 MHz. 52 MHz, max frequency value supported by MMC card
-version 4 and above, is not supported because 96 MHz, MMCHS controller functional clock, is not a
-multiple of 52 MHz. We fall off to 48 MHz.
-	 */
-	//MMCHS_SYSCTL = 0x00000087; // MMCHS controller's internal clock is stable and enabled, MMC card's clock is on. Divider value is 2 which means that MMCHS controller is supplying a 48 MHz clock.
 
 	MMCHS_IE = MMCHS_IE_CERR_BIT | MMCHS_IE_CIE_BIT | MMCHS_IE_CCRC_BIT | MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CEB_BIT | MMCHS_IE_TC_BIT | MMCHS_IE_BRR_BIT | MMCHS_IE_DTO_BIT | MMCHS_IE_DCRC_BIT | MMCHS_IE_DEB_BIT;
 	MMCHS_ARG = arg;
 	MMCHS_BLK = ( 1 << 16 ) | ( 64 ); // read one block. with length of 64 bytes, will contain
+	setDataTimeout( 27 );
 	MMCHS_CMD = MMCHS_CMD_INDX_BITS( 6 ) | MMCHS_CMD_RSP_TYPE_48_BIT | MMCHS_CMD_CICE_BIT | MMCHS_CMD_DP_BIT | MMCHS_CMD_DDIR_BIT | MMCHS_CMD_CCCE_BIT;
 
 	return awaitCommandResponse();
@@ -1214,6 +1198,7 @@ sendCmd17( uint32_t addr )
 	MMCHS_IE = MMCHS_IE_CERR_BIT | MMCHS_IE_CIE_BIT | MMCHS_IE_CCRC_BIT | MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CEB_BIT | MMCHS_IE_TC_BIT | MMCHS_IE_BRR_BIT | MMCHS_IE_DTO_BIT | MMCHS_IE_DCRC_BIT | MMCHS_IE_DEB_BIT;
 	MMCHS_ARG = addr;	// address
 	MMCHS_BLK = ( 1 << 16 ) | ( BLOCK_LEN ); // read one block. starts at bit 16, bit 0-15 contains block-size and is ALWAYS set to 512
+	setDataTimeout( 27 );
 	MMCHS_CMD = MMCHS_CMD_INDX_BITS( 17 ) | MMCHS_CMD_RSP_TYPE_48_BIT | MMCHS_CMD_CICE_BIT | MMCHS_CMD_DP_BIT | MMCHS_CMD_DDIR_BIT | MMCHS_CMD_CCCE_BIT /*| MMCHS_CMD_ACEN_BIT*/;
 
 	return awaitCommandResponse();
@@ -1236,6 +1221,7 @@ sendCmd18( uint32_t addr, uint32_t nblk )
 	MMCHS_IE = MMCHS_IE_CERR_BIT | MMCHS_IE_CIE_BIT | MMCHS_IE_CCRC_BIT | MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CEB_BIT | MMCHS_IE_TC_BIT | MMCHS_IE_BRR_BIT | MMCHS_IE_DTO_BIT | MMCHS_IE_DCRC_BIT | MMCHS_IE_DEB_BIT;
 	MMCHS_ARG = addr;	// address
 	MMCHS_BLK = ( nblk << 16 ) | ( BLOCK_LEN ); // write number of blocks/bytes to read. starts at bit 16, bit 0-15 contains block-size and is ALWAYS set to 512
+	setDataTimeout( 27 );
 	MMCHS_CMD = MMCHS_CMD_INDX_BITS( 18 ) | MMCHS_CMD_RSP_TYPE_48_BIT | MMCHS_CMD_CICE_BIT | MMCHS_CMD_DP_BIT | MMCHS_CMD_MSBS_BIT | MMCHS_CMD_BCE_BIT /*| MMCHS_CMD_ACEN_BIT */ | MMCHS_CMD_DDIR_BIT | MMCHS_CMD_CCCE_BIT;
 
 	return awaitCommandResponse();
@@ -1311,6 +1297,7 @@ sendACmd51()
 	MMCHS_IE = MMCHS_IE_CERR_BIT | MMCHS_IE_CIE_BIT | MMCHS_IE_CCRC_BIT | MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CEB_BIT | MMCHS_IE_TC_BIT | MMCHS_IE_BRR_BIT | MMCHS_IE_DTO_BIT | MMCHS_IE_DCRC_BIT | MMCHS_IE_DEB_BIT;
 	MMCHS_ARG = cardInfo.rca << 16;
 	MMCHS_BLK = ( 1 << 16 ) | ( 8 ); // read one block, but only 8 bytes - response will contain SCR which is 8 bytes wide
+	setDataTimeout( 27 );
 	MMCHS_CMD = MMCHS_CMD_INDX_BITS( 51 ) | MMCHS_CMD_RSP_TYPE_48_BIT | MMCHS_CMD_CICE_BIT | MMCHS_CMD_DP_BIT | MMCHS_CMD_DDIR_BIT | MMCHS_CMD_CCCE_BIT;
 
 	return awaitCommandResponse();

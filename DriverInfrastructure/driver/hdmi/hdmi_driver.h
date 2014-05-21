@@ -23,6 +23,15 @@ typedef struct DrawStringColorData {
 	uint32_t color;
 } DrawStringColorData_t;
 
+typedef struct SizeData {
+	uint32_t width;
+	uint32_t height;
+} SizeData_t;
+
+typedef struct Offset2DData {
+	uint32_t offsetX;
+	uint32_t offsetY;
+} Offset2DData_t;
 
 #define DSS_BASE 0x48050000
 #define DSPC_BASE 0x48050400

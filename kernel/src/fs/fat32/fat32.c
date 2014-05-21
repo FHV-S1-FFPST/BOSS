@@ -32,11 +32,14 @@ static uint8_t dataBuffer[ DATABUFFER_SIZE ];
 
 static uint32_t blocksPerSector;
 static uint8_t* sectorSizeBuffer;
+
+static uint8_t* fatTable;
 ///////////////////////////////////////////////////////////////////
 
 // module-local functions /////////////////////////////////////////
 static uint32_t loadPrimaryPartition( void );
 static uint32_t loadFAT( void );
+static uint32_t loadDirectories( void );
 ///////////////////////////////////////////////////////////////////
 
 uint32_t
@@ -60,6 +63,11 @@ fat32Init()
 	}
 
 	if ( loadFAT() )
+	{
+		return 1;
+	}
+
+	if ( loadDirectories() )
 	{
 		return 1;
 	}
@@ -98,7 +106,7 @@ loadPrimaryPartition( void )
 		return 1;
 	}
 
-	// copy piece-wise ignoring alignmenthelpers
+	// copy piece-wise ignoring alignment-bytes
 	memcpy( &fat32Bps, &dataBuffer, 11 );
 	memcpy( &( ( uint8_t* ) &fat32Bps )[ 12 ], &dataBuffer[ 11 ], 3 );
 	memcpy( &( ( uint8_t* ) &fat32Bps )[ 16 ], &dataBuffer[ 14 ], 3 );
@@ -107,31 +115,9 @@ loadPrimaryPartition( void )
 	memcpy( &( ( uint8_t* ) &fat32Bps )[ 70 ], &dataBuffer[ 65 ], 17 );
 	memcpy( &( ( uint8_t* ) &fat32Bps )[ 88 ], &dataBuffer[ 82 ], 512 - 82 );
 
-	// allocate buffer to read one sector
-	if ( DATABUFFER_SIZE == fat32Bps.bytes_per_sector )
-	{
-		// if a sector is exactly 512 bytes in size, then use the global databuffer
-		sectorSizeBuffer = dataBuffer;
-		// sector consists of exactly 1 block (of 512 bytes)
-		blocksPerSector = 1;
-	}
-	else
-	{
-		// if a sector is larger than 512 bytes in size, then allocate the required buffer size
-		sectorSizeBuffer = malloc( fat32Bps.bytes_per_sector );
-		blocksPerSector = fat32Bps.bytes_per_sector / DATABUFFER_SIZE;
-
-		// TODO: need to round blocks per sector up
-	}
-
-	return 0;
-}
-
-uint32_t
-loadFAT( void )
-{
+	// calculate total clusters and check if violates FAT32
 	uint32_t root_dir_sectors = ( ( fat32Bps.root_entry_count * 32 ) + ( fat32Bps.bytes_per_sector - 1 ) ) /
-				fat32Bps.bytes_per_sector;
+					fat32Bps.bytes_per_sector;
 	uint32_t data_sectors = fat32Bps.total_sectors_16 -
 			( fat32Bps.reserved_sector_count +
 					( fat32Bps.number_fats * fat32Bps.table_size_32 ) + root_dir_sectors );
@@ -151,23 +137,55 @@ loadFAT( void )
 	   }
 	}
 
-	uint32_t first_data_sector = primaryPartition.partitionStart +
-			fat32Bps.reserved_sector_count +
-			( fat32Bps.number_fats * fat32Bps.table_size_32 );
+	// allocate buffer to read one sector
+	if ( DATABUFFER_SIZE == fat32Bps.bytes_per_sector )
+	{
+		// if a sector is exactly 512 bytes in size, then use the global databuffer (this is the most likely case in FAT32)
+		sectorSizeBuffer = dataBuffer;
+		// sector consists of exactly 1 block (of 512 bytes)
+		blocksPerSector = 1;
+	}
+	else
+	{
+		// if a sector is larger than 512 bytes in size, then allocate the required buffer size
+		sectorSizeBuffer = malloc( fat32Bps.bytes_per_sector );
+		blocksPerSector = fat32Bps.bytes_per_sector / DATABUFFER_SIZE;
+		if ( fat32Bps.bytes_per_sector % DATABUFFER_SIZE )
+		{
+			blocksPerSector++;
+		}
+	}
 
+	return 0;
+}
+
+uint32_t
+loadFAT( void )
+{
 	uint32_t first_fat_sector = primaryPartition.partitionStart +
 			fat32Bps.reserved_sector_count;
 
-	// TODO: read complete FAT-table by reading fat32Bps.table_size_32 bytes
-
-	// read first 512 bytes of FAT-sector, will contain the file-allocation-table
-	if ( sdHalReadBlocks( first_fat_sector, 1, dataBuffer ) )
+	// allocate memory to hold the complete fat-table
+	// TODO: this malloc fails
+	fatTable = malloc( fat32Bps.table_size_32 * fat32Bps.bytes_per_sector );
+	// read the complete fat-table in one step
+	if ( sdHalReadBlocks( first_fat_sector, fat32Bps.table_size_32, fatTable ) )
 	{
 		return 1;
 	}
 
-	// read first 512 bytes of DATA-sector
-	if ( sdHalReadBlocks( first_data_sector, 1, dataBuffer ) )
+	return 0;
+}
+
+uint32_t
+loadDirectories( void )
+{
+	uint32_t first_data_sector = primaryPartition.partitionStart +
+				fat32Bps.reserved_sector_count +
+				( fat32Bps.number_fats * fat32Bps.table_size_32 );
+
+	// read the first data-sector
+	if ( sdHalReadBlocks( first_data_sector, 1, sectorSizeBuffer ) )
 	{
 		return 1;
 	}

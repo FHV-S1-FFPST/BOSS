@@ -62,6 +62,7 @@ static uint32_t sendCmd6( uint32_t arg );
 static uint32_t sendCmd7( void );
 static uint32_t sendCmd8( void );
 static uint32_t sendCmd9( void );
+static uint32_t sendCmd12( void );
 static uint32_t sendCmd16( void );
 static uint32_t sendCmd18( uint32_t addr, uint32_t nblk );
 static uint32_t sendCmd17( uint32_t addr );
@@ -176,6 +177,7 @@ static uint32_t sendACmd51();
 #define MMCHS_CMD_CCCE_BIT 							0x80000
 #define MMCHS_CMD_CICE_BIT 							0x100000
 #define MMCHS_CMD_DP_BIT 							0x200000
+#define MMCHS_CMD_TYPE_BIT_START					22
 #define MMCHS_CMD_INDX_BIT_START					24
 #define MMCHS_CMD_INDX_BITS( cmd )					( cmd & 0x3F ) << MMCHS_CMD_INDX_BIT_START
 
@@ -365,7 +367,7 @@ sdHalReadBlocks( uint32_t block, uint32_t nblk, uint8_t* buffer )
 
 	if ( 1 < nblk )
 	{
-		// TODO: send command 12 to stop transfer: busy response
+		// TODO: send command 12 to stop transfer: busy response - BUT SEEMS TO WORK WITHOUT FOR NOW
 	}
 
 	// transfer complete, no error occured
@@ -854,8 +856,6 @@ readTransferBuffer( uint32_t nBytes, uint8_t* buffer )
 			}
 		}
 
-		// TODO: if Auto CMD12 is enabled (MMCi.MMCHS_CMD[2] ACEN bit to 0x1) then nothing has to be done, otherwise CMD12 needs to be sent now
-
 		// NOTE: for dependencies between error flags and transfer complete in MMCHS_STAT see page 3157
 		if ( isTransferComplete() )
 		{
@@ -1254,6 +1254,24 @@ sendCmd9( void )
 	return awaitCommandResponse();
 }
 
+/** NOTE: STOP_TRANSMISSION
+ * Forces the card to stop transmission.
+ *
+ * type:	ac
+ * resp:	R1b (busy!)
+ * arg:		[31:0] stuff bits
+ */
+uint32_t
+sendCmd12( void )
+{
+	// NOTE: seems to work without it for now
+
+	MMCHS_IE = MMCHS_IE_CCRC_BIT | MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CEB_BIT;
+	MMCHS_ARG = 0x0;
+	MMCHS_CMD = MMCHS_CMD_INDX_BITS( 12 ) | MMCHS_CMD_RSP_TYPE_48BUSY_BIT | MMCHS_CMD_CCCE_BIT;
+
+	return awaitCommandResponse();
+}
 
 /* NOTE: SET_BLOCKLEN
  * In the case of a Standard Capacity SD Memory Card, this command sets the block length (in bytes) for all following
@@ -1318,8 +1336,7 @@ sendCmd18( uint32_t addr, uint32_t nblk )
 	setDataTimeout( 27 );
 	MMCHS_CMD = MMCHS_CMD_INDX_BITS( 18 ) | MMCHS_CMD_RSP_TYPE_48_BIT | MMCHS_CMD_CICE_BIT | MMCHS_CMD_DP_BIT | MMCHS_CMD_DDIR_BIT | MMCHS_CMD_MSBS_BIT | MMCHS_CMD_BCE_BIT | MMCHS_CMD_CCCE_BIT /*| MMCHS_CMD_ACEN_BIT */;
 
-	// TODO: add CMD_TYPE 3
-
+	// TODO: add CMD_TYPE 3	| 0x3 << MMCHS_CMD_TYPE_BIT_START - BUT SEEMS TO WORK WITHOUT FOR NOW
 	return awaitCommandResponse();
 }
 

@@ -20,44 +20,69 @@ typedef struct
 	uint16_t endCylinder;
 	uint32_t sectorsDeltaMBRToFirstSector;
 	uint32_t numbersOfSectors;
-} PRIMARY_PARTITION_STRUCT;
+} PRIMARY_PARTITION_INFO_STRUCT;
 
-// NOTE: starts at offset 0 in BIOS PARAMETER BLOCK
+// NOTE: TODO
 typedef struct
 {
-	uint8_t  BS_jmpBoot[ 3 ];
-	uint8_t	 BS_OEMName[ 8 ];
-	uint16_t BPB_BytsPerSec;
-	uint8_t  BPB_SecPerClus;
-	uint16_t BPB_RsvdSecCnt;
-	uint8_t  BPB_NumFATs;
-	uint16_t BPB_RootEntCnt;
-	uint16_t BPB_TotSec16;
-	uint8_t  BPB_Media;
-	uint16_t BPB_FATSz16;
-	uint16_t BPB_SecPerTrk;
-	uint16_t BPB_NumHeads;
-	uint32_t BPB_HiddSec;
-	uint32_t BPB_TotSec32;
-} GLOBAL_BPS_STRUCT;
+	uint8_t		bootjmp[ 3 ];
+	uint8_t		oem_name[ 8 ];
 
-// NOTE: starts at offset 36 in BIOS PARAMETER BLOCK
-typedef struct
-{
-	uint32_t BPB_FATSz32;
-	uint16_t BPB_ExtFlags;
-	uint16_t BPB_FSVer;
-	uint32_t BPB_RootClus;
-	uint16_t BPB_FSInfo;
-	uint16_t BPB_BkBootSec;
-	uint32_t BPB_Reserved[ 3 ];
-	uint8_t	 BS_DrvNum;
-	uint8_t  BS_Reserved1;
-	uint8_t  BS_BootSig;
-	uint32_t BS_VolID;
-	uint8_t	 BS_VolLab[ 11 ];
-	uint8_t	 BS_FilSysType[ 8 ];
-} FAT32_BPS_STRUCT;
+	// align next to 12
+	uint8_t		__alignmentHelper1;
+
+	uint16_t	bytes_per_sector;
+	uint8_t		sectors_per_cluster;
+
+	// align next to 16
+	uint8_t		__alignmentHelper2;
+
+	uint16_t	reserved_sector_count;
+	uint8_t		table_count;
+
+	// align next to 20
+	uint8_t		__alignmentHelper3;
+
+	uint16_t	root_entry_count;
+	uint16_t	total_sectors_16;
+	uint8_t		media_type;
+
+	// align next to 26
+	uint8_t		__alignmentHelper4;
+
+	uint16_t	table_size_16;
+	uint16_t	sectors_per_track;
+	uint16_t	head_side_count;
+	uint32_t 	hidden_sector_count;
+	uint32_t 	total_sectors_32;
+
+	// FAT32 specific fields
+	uint32_t	table_size_32;
+	uint16_t	extended_flags;
+	uint16_t	fat_version;
+	uint32_t	root_cluster;
+	uint16_t	fat_info;
+	uint16_t	backup_BS_sector;
+	uint8_t 	reserved_0[12];
+	uint8_t		drive_number;
+
+	// align next to 70
+	uint8_t		__alignmentHelper5;
+
+	uint8_t		reserved_1;
+	uint8_t		boot_signature;
+	uint32_t	volume_id;
+	uint8_t		volume_label[ 11 ];
+
+	// align next to 88
+	uint8_t		__alignmentHelper6;
+
+	uint8_t		fat_type_label[ 8 ];
+
+	uint8_t 	boot_code[ 420 ];
+	uint16_t 	signature;
+} FAT32_BPS_INFO_STRUCT;
+
 
 uint32_t fat32Init();
 

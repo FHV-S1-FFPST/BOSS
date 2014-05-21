@@ -93,7 +93,7 @@ loadPrimaryPartition( void )
 	}
 
 	// read first 512 bytes of primary partition, will contain the information
-	if ( sdHalReadBlocks( primaryPartition.sectorsDeltaMBRToFirstSector, 1, dataBuffer ) )
+	if ( sdHalReadBlocks( primaryPartition.partitionStart, 1, dataBuffer ) )
 	{
 		return 1;
 	}
@@ -131,32 +131,45 @@ uint32_t
 loadFAT( void )
 {
 	uint32_t root_dir_sectors = ( ( fat32Bps.root_entry_count * 32 ) + ( fat32Bps.bytes_per_sector - 1 ) ) /
-			fat32Bps.bytes_per_sector;
-
-	uint32_t first_data_sector = fat32Bps.reserved_sector_count +
-			( fat32Bps.table_count * fat32Bps.table_size_16 );
-
-	uint32_t first_fat_sector = fat32Bps.reserved_sector_count;
-
+				fat32Bps.bytes_per_sector;
 	uint32_t data_sectors = fat32Bps.total_sectors_16 -
 			( fat32Bps.reserved_sector_count +
-					( fat32Bps.table_count * fat32Bps.table_size_16 ) +
-					root_dir_sectors );
-
+					( fat32Bps.number_fats * fat32Bps.table_size_32 ) + root_dir_sectors );
 	uint32_t total_clusters = data_sectors / fat32Bps.sectors_per_cluster;
 
 	// ERROR: this is a FAT12 filesystem
-	if( total_clusters < 4085 )
+	if ( total_clusters < 4085 )
 	{
 		return 1;
 	}
 	else
 	{
 		// ERROR: this is a FAT16 filesystem
-	   if( total_clusters < 65525)
+	   if ( total_clusters < 65525)
 	   {
 		   return 1;
 	   }
+	}
+
+	uint32_t first_data_sector = primaryPartition.partitionStart +
+			fat32Bps.reserved_sector_count +
+			( fat32Bps.number_fats * fat32Bps.table_size_32 );
+
+	uint32_t first_fat_sector = primaryPartition.partitionStart +
+			fat32Bps.reserved_sector_count;
+
+	// TODO: read complete FAT-table by reading fat32Bps.table_size_32 bytes
+
+	// read first 512 bytes of FAT-sector, will contain the file-allocation-table
+	if ( sdHalReadBlocks( first_fat_sector, 1, dataBuffer ) )
+	{
+		return 1;
+	}
+
+	// read first 512 bytes of DATA-sector
+	if ( sdHalReadBlocks( first_data_sector, 1, dataBuffer ) )
+	{
+		return 1;
 	}
 
 	return 0;

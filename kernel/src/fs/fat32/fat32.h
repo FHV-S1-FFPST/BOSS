@@ -18,7 +18,7 @@ typedef struct
 	uint8_t type;
 	uint8_t endHead;
 	uint16_t endCylinder;
-	uint32_t sectorsDeltaMBRToFirstSector;
+	uint32_t partitionStart;
 	uint32_t numbersOfSectors;
 } PRIMARY_PARTITION_INFO_STRUCT;
 
@@ -38,7 +38,7 @@ typedef struct
 	uint8_t		__alignmentHelper2;
 
 	uint16_t	reserved_sector_count;
-	uint8_t		table_count;
+	uint8_t		number_fats;
 
 	// align next to 20
 	uint8_t		__alignmentHelper3;

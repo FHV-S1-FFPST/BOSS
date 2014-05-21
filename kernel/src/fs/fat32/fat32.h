@@ -10,6 +10,18 @@
 
 #include <inttypes.h>
 
+typedef struct
+{
+	uint8_t entryState;
+	uint8_t startHead;
+	uint16_t startCylinder;
+	uint8_t type;
+	uint8_t endHead;
+	uint16_t endCylinder;
+	uint32_t sectorsDeltaMBRToFirstSector;
+	uint32_t numbersOfSectors;
+} PRIMARY_PARTITION_STRUCT;
+
 // NOTE: starts at offset 0 in BIOS PARAMETER BLOCK
 typedef struct
 {

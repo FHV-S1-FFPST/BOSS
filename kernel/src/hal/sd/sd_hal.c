@@ -363,6 +363,11 @@ sdHalReadBlocks( uint32_t block, uint32_t nblk, uint8_t* buffer )
 		return 1;
 	}
 
+	if ( 1 < nblk )
+	{
+		// TODO: send command 12 to stop transfer: busy response
+	}
+
 	// transfer complete, no error occured
 	return 0;
 }
@@ -842,10 +847,10 @@ readTransferBuffer( uint32_t nBytes, uint8_t* buffer )
 				// NOTE: read 4bytes of data from data-address, will be moved by controller automatically
 				volatile uint32_t data = MMCHS_DATA;
 
-				buffer[ i + 0 ] = 0xFF & ( data >> 0 );
-				buffer[ i + 1 ] = 0xFF & ( data >> 8 );
-				buffer[ i + 2 ] = 0xFF & ( data >> 16 );
-				buffer[ i + 3 ] = 0xFF & ( data >> 24 );
+				buffer[ i + 0 ] = *( ( uint8_t* ) &data + 0 );
+				buffer[ i + 1 ] = *( ( uint8_t* ) &data + 1 );
+				buffer[ i + 2 ] = *( ( uint8_t* ) &data + 2 );
+				buffer[ i + 3 ] = *( ( uint8_t* ) &data + 3 );
 			}
 		}
 
@@ -1288,7 +1293,7 @@ sendCmd17( uint32_t addr )
 	MMCHS_ARG = addr;	// address
 	MMCHS_BLK = ( 1 << 16 ) | ( BLOCK_LEN ); // read one block. starts at bit 16, bit 0-15 contains block-size and is ALWAYS set to 512
 	setDataTimeout( 27 );
-	MMCHS_CMD = MMCHS_CMD_INDX_BITS( 17 ) | MMCHS_CMD_RSP_TYPE_48_BIT | MMCHS_CMD_CICE_BIT | MMCHS_CMD_DP_BIT | MMCHS_CMD_DDIR_BIT | MMCHS_CMD_CCCE_BIT /*| MMCHS_CMD_ACEN_BIT*/;
+	MMCHS_CMD = MMCHS_CMD_INDX_BITS( 17 ) | MMCHS_CMD_RSP_TYPE_48_BIT | MMCHS_CMD_CICE_BIT | MMCHS_CMD_DP_BIT | MMCHS_CMD_DDIR_BIT | MMCHS_CMD_MSBS_BIT | MMCHS_CMD_BCE_BIT | MMCHS_CMD_CCCE_BIT /*| MMCHS_CMD_ACEN_BIT*/;
 
 	return awaitCommandResponse();
 }
@@ -1311,7 +1316,9 @@ sendCmd18( uint32_t addr, uint32_t nblk )
 	MMCHS_ARG = addr;	// address
 	MMCHS_BLK = ( nblk << 16 ) | ( BLOCK_LEN ); // write number of blocks/bytes to read. starts at bit 16, bit 0-15 contains block-size and is ALWAYS set to 512
 	setDataTimeout( 27 );
-	MMCHS_CMD = MMCHS_CMD_INDX_BITS( 18 ) | MMCHS_CMD_RSP_TYPE_48_BIT | MMCHS_CMD_CICE_BIT | MMCHS_CMD_DP_BIT | MMCHS_CMD_MSBS_BIT | MMCHS_CMD_BCE_BIT /*| MMCHS_CMD_ACEN_BIT */ | MMCHS_CMD_DDIR_BIT | MMCHS_CMD_CCCE_BIT;
+	MMCHS_CMD = MMCHS_CMD_INDX_BITS( 18 ) | MMCHS_CMD_RSP_TYPE_48_BIT | MMCHS_CMD_CICE_BIT | MMCHS_CMD_DP_BIT | MMCHS_CMD_DDIR_BIT | MMCHS_CMD_MSBS_BIT | MMCHS_CMD_BCE_BIT | MMCHS_CMD_CCCE_BIT /*| MMCHS_CMD_ACEN_BIT */;
+
+	// TODO: add CMD_TYPE 3
 
 	return awaitCommandResponse();
 }

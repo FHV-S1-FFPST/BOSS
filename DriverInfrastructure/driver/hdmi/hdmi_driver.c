@@ -268,8 +268,13 @@ static unsigned char font[2048] =
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00	// Char 255 (.)
 };
 
-uint32_t window_width;
+uint32_t screen_width;
+uint32_t screen_height;
+
 uint32_t window_height;
+uint32_t window_width;
+uint32_t window_offsetX;
+uint32_t window_offsetY;
 
 uint32_t currentRowStart;
 uint32_t currentRow;
@@ -308,15 +313,15 @@ static void drawCharacterWithColor(char c, uint32_t color) {
 	uint32_t j;
 	uint32_t k;
 
-	if(currentRow + 8*scalingFactor > window_width * 3) {
+	if(currentRow + 8*scalingFactor > screen_width * 3) {
 		drawCharacter('\n');
 	}
 
 
-	if(currentLine + 8 * scalingFactor > window_height) {
+	if(currentLine + 8 * scalingFactor > screen_height) {
 		currentLine -= 8 * scalingFactor;
 		currentLineStart = currentLine;
-		memcpy(framebuff, &framebuff[window_width * 3 * scalingFactor * 8], buffSize - window_width * 3 * scalingFactor * 8);
+		memcpy(framebuff, &framebuff[screen_width * 3 * scalingFactor * 8], buffSize - screen_width * 3 * scalingFactor * 8);
 		//memset(&framebuff[(960-(8 * scalingFactor))*window_width*3], '0', window_width * 8 * 3 * scalingFactor);
 	}
 
@@ -327,7 +332,7 @@ static void drawCharacterWithColor(char c, uint32_t color) {
 			uint32_t temp = (lineBitmap >> (7-k)) & 0x01;
 
 			if(temp == 1) {
-				framebuffPos = currentLine * window_width * 3 + currentRow;
+				framebuffPos = currentLine * screen_width * 3 + currentRow;
 				for(j = 0; j < 3 * scalingFactor; j += 3) {
 					framebuff[framebuffPos + j] = (char) (color & 0xFF);
 					framebuff[framebuffPos + j + 1] = (char) ((color >> 8) & 0xFF);
@@ -341,7 +346,7 @@ static void drawCharacterWithColor(char c, uint32_t color) {
 		uint32_t tempLine = currentLine;
 		for(j = 1; j < scalingFactor; j++) {
 			++currentLine;
-			memcpy(&framebuff[currentLine * window_width * 3], &framebuff[tempLine * window_width * 3], window_width * 3);
+			memcpy(&framebuff[currentLine * screen_width * 3], &framebuff[tempLine * screen_width * 3], screen_width * 3);
 		}
 
 		++currentLine;
@@ -363,7 +368,7 @@ static void drawHorizontalLine(uint32_t offset, uint32_t length) {
 
 	uint32_t i;
 	uint32_t lengthRGB = length * 3;
-	uint32_t startAdress = offset * window_width * 3;
+	uint32_t startAdress = offset * screen_width * 3;
 	for(i = 0; i < lengthRGB; i += 3) {
 		framebuff[startAdress + i] = (char) 255;
 		framebuff[startAdress + i + 1] = (char) 255;
@@ -377,7 +382,7 @@ static void drawVerticalLine(uint32_t offset, uint32_t length) {
 
 	for(j = 0; j < 15; j += 3) {
 		for(i = 0; i < length; i++) {
-			uint32_t startAdress = i*window_width * 3 + offset * 3;
+			uint32_t startAdress = i*screen_width * 3 + offset * 3;
 			framebuff[startAdress + j] = (char) 255;
 			framebuff[startAdress + 1 + j] = (char) 255;
 			framebuff[startAdress + 2 + j] = (char) 255;
@@ -392,6 +397,18 @@ static void drawStringWithColor(char *s, uint32_t color) {
 		drawCharacterWithColor(s[i], color);
 		++i;
 	}
+}
+
+static void setWindowSize(uint32_t width, uint32_t height) {
+	window_height = height;
+	window_width = width;
+	reg32w(DSPC_BASE, DSPC_GFX_SIZE, ((window_height -1) << 16) | ( window_width -1));
+}
+
+static void setWindowOffset(uint32_t offsetX, uint32_t offsetY) {
+	window_offsetX = offsetX;
+	window_offsetY = offsetY;
+	reg32w(DSPC_BASE, DSPC_GFX_POS, (window_offsetY << 16) | window_offsetX);
 }
 
 static void attachFrameBuffer(char * framebuffer) {
@@ -411,6 +428,9 @@ static RETURN_CODE ioctlHDMI(struct driver *self, enum IOCTL_CMD cmd, void *data
 	OffsetLengthData_t *ol;
 	DrawStringColorData_t *dscd;
 	char * framebuffer;
+
+	SizeData_t *sd;
+	Offset2DData_t *o2dd;
 
 	switch(cmd) {
 	case SET_SCALE:
@@ -439,6 +459,16 @@ static RETURN_CODE ioctlHDMI(struct driver *self, enum IOCTL_CMD cmd, void *data
 		attachFrameBuffer(framebuffer);
 		break;
 
+	case SET_WINDOW_SIZE:
+		sd = (SizeData_t *)data;
+		setWindowSize(sd->width, sd->height);
+		break;
+
+	case SET_WINDOW_OFFSET:
+		o2dd = (Offset2DData_t *)data;
+		setWindowOffset(o2dd->offsetX, o2dd->offsetY);
+		break;
+
 	default:
 		return FAILURE;
 	}
@@ -447,18 +477,23 @@ static RETURN_CODE ioctlHDMI(struct driver *self, enum IOCTL_CMD cmd, void *data
 }
 
 static RETURN_CODE openHDMI(Driver_t *self) {
-		window_height = 960;
-		window_width = 1024;
+		screen_height = 960;
+		screen_width = 1024;
 		scalingFactor = 1;
+
+		window_height = screen_height;
+		window_width = screen_width;
+		window_offsetX = 0;
+		window_offsetY = 0;
 
 		currentRow = 0;
 		currentLine = 0;
 		currentRowStart = 0;
 
-		buffSize = window_height * window_width * 3;
+		buffSize = screen_height * screen_width * 3;
 
 		reg32w(DSPC_BASE, DSPC_DEFAULT_COLOR_0, 0x000000);
-		reg32w(DSPC_BASE, DSPC_SIZE_LCD, (window_height - 1) << 16 | (window_width - 1));
+		reg32w(DSPC_BASE, DSPC_SIZE_LCD, (screen_height - 1) << 16 | (screen_width - 1));
 		reg32w(DSPC_BASE, DSPC_TIMING_H, 0x0cf03f31);
 		reg32w(DSPC_BASE, DSPC_TIMING_V, 0x01400504);
 
@@ -472,7 +507,7 @@ static RETURN_CODE openHDMI(Driver_t *self) {
 
 		reg32w(DSPC_BASE, DSPC_GFX_BA1, (uint32_t) framebuff);
 		reg32w(DSPC_BASE, DSPC_GFX_SIZE, ((window_height -1) << 16) | ( window_width -1));
-		reg32w(DSPC_BASE, DSPC_GFX_POS, (0 << 16) | 0);
+		reg32w(DSPC_BASE, DSPC_GFX_POS, (window_offsetY << 16) | window_offsetX);
 		reg32w(DSPC_BASE, DSPC_GFX_ATTRIBUTES, (0x0 << 8) | (0x2 << 6) | (0x9 << 1) | 0x1);
 		reg32w(DSPC_BASE, DSPC_CONTROL, reg32r(DSPC_BASE, DSPC_CONTROL) | 0x01 << 5);
 

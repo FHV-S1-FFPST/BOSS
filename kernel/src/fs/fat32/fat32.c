@@ -174,6 +174,7 @@ static uint32_t loadFAT( void );
 static uint32_t loadFsRoot( void );
 static uint32_t loadDirectory( uint32_t cluster, DIR_ENTRY* dir );
 static void readDirectory( uint8_t* buffer, DIR_ENTRY* dir );
+static uint32_t locateDirEntry( int8_t* filePath, DIR_ENTRY* parent, DIR_ENTRY** entry );
 ///////////////////////////////////////////////////////////////////
 
 uint32_t
@@ -210,9 +211,16 @@ fat32Init( void )
 }
 
 uint32_t
-fat32Open( char* fileName, FILE* file )
+fat32Open( int8_t* filePath, FILE* file )
 {
-	// TODO: implement
+	DIR_ENTRY* entry = 0;
+
+	if ( locateDirEntry( filePath, &_fsRoot, &entry ) )
+	{
+		return 1;
+	}
+
+
 
 	return 0;
 }
@@ -229,6 +237,32 @@ uint32_t
 fat32Read( uint32_t nBytes, uint8_t* buffer )
 {
 	// TODO: implement
+
+	return 0;
+}
+
+uint32_t
+locateDirEntry( int8_t* filePath, DIR_ENTRY* parent, DIR_ENTRY** entry )
+{
+	uint32_t i = 0;
+
+	int8_t* isDirectory = strchr( filePath, '/' );
+	int8_t* fileName = filePath;
+
+	if ( isDirectory )
+	{
+		fileName = strtok( fileName, "/" );
+	}
+
+	for ( i = 0; i < parent->childrenCount; ++i )
+	{
+		DIR_ENTRY* child = &( ( DIR_ENTRY* ) parent->children )[ i ];
+
+		if ( fileName == strstr( fileName, child->fileName ) )
+		{
+
+		}
+	}
 
 	return 0;
 }

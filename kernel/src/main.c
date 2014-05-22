@@ -112,6 +112,32 @@ initDrivers( void )
 		return 1;
 	}
 
+	FILE boss = 0;
+	FILE bossDir = 0;
+	FILE bossSub = 0;
+	FILE bossDir2 = 0;
+
+	if ( fat32Open( "boss.txt", &boss ) )
+	{
+		return 1;
+	}
+
+	if ( fat32Open( "bossdir/bossdir.txt", &bossDir ) )
+	{
+		return 1;
+	}
+
+	if ( fat32Open( "bossdir/bosssub/bosssub.txt", &bossSub ) )
+	{
+		return 1;
+	}
+
+	// should fail - cannot open a directory
+	if ( fat32Open( "BossDir2", &bossDir2 ) )
+	{
+		return 1;
+	}
+
 	return 0;
 }
 

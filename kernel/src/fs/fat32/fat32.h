@@ -13,7 +13,7 @@
 typedef uint32_t FILE;
 
 uint32_t fat32Init( void );
-uint32_t fat32Open( int8_t* filePath, FILE* file );
+uint32_t fat32Open( const char* filePath, FILE* file );
 uint32_t fat32Close( FILE file );
 uint32_t fat32Read( uint32_t nBytes, uint8_t* buffer );
 

@@ -46,7 +46,7 @@ typedef struct
 	uint8_t type;
 	uint8_t endHead;
 	uint16_t endCylinder;
-	uint32_t partitionStart;
+	uint32_t partitionStart_lba;
 	uint32_t numbersOfSectors;
 } PRIMARY_PARTITION_INFO_STRUCT;
 
@@ -115,7 +115,7 @@ typedef struct
 
 typedef struct
 {
-	uint8_t		fileName[ 11 ];
+	char		fileName[ 11 ];
 	uint8_t 	attributes;
 	uint8_t 	reserved;
 	uint8_t 	createdSecFract;
@@ -140,11 +140,12 @@ typedef enum
 // capable of handling this
 typedef struct
 {
-	uint8_t		fileName[ 11 ];
+	char		fileName[ 12 ];
 	DIR_TYPE 	type;
+	uint32_t 	clusterNumber;
 	uint32_t	fileSize;
 
-	uint32_t	childrenCount;
+	int32_t		childrenCount;
 	void*		children;
 } DIR_ENTRY;
 
@@ -166,6 +167,8 @@ static uint8_t* _fatTable;
 
 static uint8_t* _clusterBuffer;
 static uint32_t _clusterBufferSize;
+
+static uint32_t _clusterBegin_lba;
 ///////////////////////////////////////////////////////////////////
 
 // module-local functions /////////////////////////////////////////
@@ -174,7 +177,7 @@ static uint32_t loadFAT( void );
 static uint32_t loadFsRoot( void );
 static uint32_t loadDirectory( uint32_t cluster, DIR_ENTRY* dir );
 static void readDirectory( uint8_t* buffer, DIR_ENTRY* dir );
-static uint32_t locateDirEntry( int8_t* filePath, DIR_ENTRY* parent, DIR_ENTRY** entry );
+static uint32_t locateDirEntry( const char* filePath, DIR_ENTRY* parent, DIR_ENTRY** entry );
 ///////////////////////////////////////////////////////////////////
 
 uint32_t
@@ -211,7 +214,7 @@ fat32Init( void )
 }
 
 uint32_t
-fat32Open( int8_t* filePath, FILE* file )
+fat32Open( const char* filePath, FILE* file )
 {
 	DIR_ENTRY* entry = 0;
 
@@ -242,12 +245,12 @@ fat32Read( uint32_t nBytes, uint8_t* buffer )
 }
 
 uint32_t
-locateDirEntry( int8_t* filePath, DIR_ENTRY* parent, DIR_ENTRY** entry )
+locateDirEntry( const char* filePath, DIR_ENTRY* parent, DIR_ENTRY** entry )
 {
 	uint32_t i = 0;
 
-	int8_t* isDirectory = strchr( filePath, '/' );
-	int8_t* fileName = filePath;
+	char* isDirectory = strchr( filePath, '/' );
+	char* fileName = ( char* ) filePath;
 
 	if ( isDirectory )
 	{
@@ -258,9 +261,47 @@ locateDirEntry( int8_t* filePath, DIR_ENTRY* parent, DIR_ENTRY** entry )
 	{
 		DIR_ENTRY* child = &( ( DIR_ENTRY* ) parent->children )[ i ];
 
+		// look for a matching file-name
 		if ( fileName == strstr( fileName, child->fileName ) )
 		{
+			// the entry is a directory, check if its part of the filename and traverse down
+			if ( DIRECTORY == child->type )
+			{
+				// its part of the filename, look recursively in the subdirectory
+				if ( isDirectory )
+				{
+					// directory not yet loaded, load it now
+					if ( -1 == child->childrenCount )
+					{
+						uint32_t cluster_lba = _clusterBegin_lba + ( child->clusterNumber - 2 ) * _fat32Bps.sectors_per_cluster;
 
+						// loading failed
+						if ( loadDirectory( cluster_lba, child ) )
+						{
+							return 1;
+						}
+					}
+
+					// look recursively in subdirectory
+					return locateDirEntry( isDirectory + 1, child, entry );
+				}
+				// its the ending of the filename
+				else
+				{
+					// want to open a directory, is not allowed
+					return 1;
+				}
+			}
+			// the entry is a file, found it if its not part of the filname but its ending
+			else if ( ARCHIVE == child->type )
+			{
+				if ( ! isDirectory )
+				{
+					// found
+					*entry = child;
+					return 0;
+				}
+			}
 		}
 	}
 
@@ -296,7 +337,7 @@ loadPrimaryPartition( void )
 	}
 
 	// read BPS of primary partition, will contain the information
-	if ( sdHalReadBlocks( _primaryPartition.partitionStart, 1, dataBuffer ) )
+	if ( sdHalReadBlocks( _primaryPartition.partitionStart_lba, 1, dataBuffer ) )
 	{
 		return 1;
 	}
@@ -330,15 +371,17 @@ loadPrimaryPartition( void )
 uint32_t
 loadFAT( void )
 {
-	uint32_t fatTableSize = _fat32Bps.table_size_32 * _fat32Bps.bytes_per_sector;
-	uint32_t firstFatSector = _primaryPartition.partitionStart + _fat32Bps.reserved_sector_count;
+	// TODO: maybe we don't need to read the complete FAT-table once, at it takes some time the larger the filesystem
+
+	uint32_t fatTableSize = _fat32Bps.table_size_32 * _fat32Bps.bytes_per_sector; // is sectors * bytes
+	uint32_t firstFatSector_lba = _primaryPartition.partitionStart_lba + _fat32Bps.reserved_sector_count;
 
 	// allocate memory to hold the complete fat-table
 	_fatTable = malloc( fatTableSize );
 	memset( _fatTable, 0, fatTableSize );
 
 	// read the complete fat-table in one step
-	if ( sdHalReadBlocks( firstFatSector, _fat32Bps.table_size_32 * _blocksPerSector, _fatTable ) )
+	if ( sdHalReadBlocks( firstFatSector_lba, _fat32Bps.table_size_32 * _blocksPerSector, _fatTable ) )
 	{
 		return 1;
 	}
@@ -349,14 +392,14 @@ loadFAT( void )
 uint32_t
 loadFsRoot( void )
 {
-	uint32_t firstDataSector = _primaryPartition.partitionStart + _fat32Bps.reserved_sector_count + ( _fat32Bps.number_fats * _fat32Bps.table_size_32 );
+	_clusterBegin_lba = _primaryPartition.partitionStart_lba + _fat32Bps.reserved_sector_count + ( _fat32Bps.number_fats * _fat32Bps.table_size_32 );
 
 	// allocate memory to hold one complete cluster
 	_clusterBufferSize = _fat32Bps.bytes_per_sector * _fat32Bps.sectors_per_cluster;
 	_clusterBuffer = malloc( _clusterBufferSize );
 	memset( _clusterBuffer, 0, _clusterBufferSize );
 
-	if ( loadDirectory( firstDataSector, &_fsRoot ) )
+	if ( loadDirectory( _clusterBegin_lba, &_fsRoot ) )
 	{
 		return 1;
 	}
@@ -365,10 +408,10 @@ loadFsRoot( void )
 }
 
 uint32_t
-loadDirectory( uint32_t cluster, DIR_ENTRY* dir )
+loadDirectory( uint32_t cluster_lba, DIR_ENTRY* dir )
 {
 	// read the complete first cluster
-	if ( sdHalReadBlocks( cluster, _fat32Bps.sectors_per_cluster * _blocksPerSector, _clusterBuffer ) )
+	if ( sdHalReadBlocks( cluster_lba, _fat32Bps.sectors_per_cluster * _blocksPerSector, _clusterBuffer ) )
 	{
 		return 1;
 	}
@@ -448,6 +491,7 @@ readDirectory( uint8_t* buffer, DIR_ENTRY* dir )
 		if ( DIR_ATTRIB_DIRECTORY & fat32Entry->attributes )
 		{
 			( ( DIR_ENTRY* ) dir->children )[ childIndex ].type = DIRECTORY;
+			( ( DIR_ENTRY* ) dir->children )[ childIndex ].childrenCount = -1; // set to -1 to mark as not loaded yet - will be done lazily when searching through the filesystem during open file
 		}
 
 		if ( DIR_ATTRIB_ARCHIVE & fat32Entry->attributes )
@@ -456,7 +500,26 @@ readDirectory( uint8_t* buffer, DIR_ENTRY* dir )
 		}
 
 		( ( DIR_ENTRY* ) dir->children )[ childIndex ].fileSize = fat32Entry->fileSize;
-		memcpy( ( ( DIR_ENTRY* ) dir->children )[ childIndex ].fileName, fat32Entry->fileName, sizeof( fat32Entry->fileName ) );
+		( ( DIR_ENTRY* ) dir->children )[ childIndex ].clusterNumber = ( fat32Entry->clusterNumberHigh << 0x10 ) | fat32Entry->clusterNumberLow;
+
+
+		char* firstSpace = strchr( fat32Entry->fileName, ' ' );
+		if ( firstSpace )
+		{
+			char* lastSpace = strrchr( fat32Entry->fileName, ' ' );
+		}
+		else
+		{
+			// TODO: handle filenames without endings:
+			// xy.txt
+			// xy
+
+			memcpy( ( ( DIR_ENTRY* ) dir->children )[ childIndex ].fileName, fat32Entry->fileName, 8 );
+			( ( DIR_ENTRY* ) dir->children )[ childIndex ].fileName[ 8 ] = '.';
+			memcpy( &( ( DIR_ENTRY* ) dir->children )[ childIndex ].fileName[ 9 ], &fat32Entry->fileName[ 8 ], 3 );
+		}
+
+		// TODO: transform to lower-case
 
 		++childIndex;
 	}

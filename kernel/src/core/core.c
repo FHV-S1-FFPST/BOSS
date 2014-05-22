@@ -35,11 +35,14 @@ initCore( void )
 	sysTimerInit( SYSTIMER_OVERFLOW_INTERVAL_MS );
 	irqRegisterClbk( handleSystemTimerOverflow, GPT10_IRQ );
 
+	/*
 	// TODO: this shouldnt be necessary anymore because this is handled inside timer
 	// NOTE: need to waste some time, otherwise IRQ won't hit
+	// TODO: this leads to errors
 	volatile uint32_t i = 100000;
 	while ( i > 0 )
 		--i;
+	*/
 
 	return 0;
 }

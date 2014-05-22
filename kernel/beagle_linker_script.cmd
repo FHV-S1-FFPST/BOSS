@@ -5,12 +5,12 @@
 //
 
 -stack           0x00002000
--heap            0x00002000
+-heap            0x00F00000
 
 MEMORY
 {
 	int_ram:	ORIGIN = 0x40200000		LENGTH = 0x0000FFFF
-	ext_ddr:	ORIGIN = 0x80000000		LENGTH = 0x20000000
+	ext_ddr:	ORIGIN = 0x80000000		LENGTH = 0x40000000
 }
 
 SECTIONS

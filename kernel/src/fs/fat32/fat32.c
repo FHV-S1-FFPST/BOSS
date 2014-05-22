@@ -13,37 +13,171 @@
 #include <string.h>
 #include <stdlib.h>
 
-#define GLOBAL_BPS_STRUCT_OFFSET 		0
-#define FAT32_BPS_STRUCT_OFFSET			36
+// module defines //////////////////////////////////////////////
+#define SD_CARD_BLOCK_SIZE				512
 
-#define DATABUFFER_SIZE 				512
+#define MBR_AND_BPS_SIZE				0x200
 
-#define BOOTSECTOR_SIGNATURE_VALUE		0xAA55
-#define BOOTSECTOR_SIGNATURE_OFFSET		0x1FE
+#define MBR_SIGNATURE_VALUE				0xAA55
+#define MBR_SIGNATURE_OFFSET			0x1FE
 #define PRIMARY_PARTITION_OFFSET		0x1BE
 
 #define PRIMARY_PARTITION_FAT32_TYPE	0xB
 
+#define FAT32_MIN_CLUSTER_COUNT			65525
+
+#define DIRECTORY_UNUSED 			0xE5
+#define DIRECTORY_END				0x0
+
+#define DIR_ATTRIB_READONLY			0x1
+#define DIR_ATTRIB_HIDDEN			0x2
+#define DIR_ATTRIB_SYSTEM			0x4
+#define DIR_ATTRIB_VOLID			0x8
+#define DIR_ATTRIB_DIRECTORY		0x10
+#define DIR_ATTRIB_ARCHIVE			0x20
+///////////////////////////////////////////////////////////////////
+
+// module-local structures
+typedef struct
+{
+	uint8_t entryState;
+	uint8_t startHead;
+	uint16_t startCylinder;
+	uint8_t type;
+	uint8_t endHead;
+	uint16_t endCylinder;
+	uint32_t partitionStart;
+	uint32_t numbersOfSectors;
+} PRIMARY_PARTITION_INFO_STRUCT;
+
+// NOTE: using packed AND enabling --unaligned-access=on in compiler options doesnt help:
+// unaligned access will lead to data-abort interruptions => insert alignmentbytes by hand
+// and copy piece-wise
+typedef struct
+{
+	uint8_t		bootjmp[ 3 ];
+	uint8_t		oem_name[ 8 ];
+
+	// align next to 12
+	uint8_t		__alignmentByte1;
+
+	uint16_t	bytes_per_sector;
+	uint8_t		sectors_per_cluster;
+
+	// align next to 16
+	uint8_t		__alignmentByte2;
+
+	uint16_t	reserved_sector_count;
+	uint8_t		number_fats;
+
+	// align next to 20
+	uint8_t		__alignmentByte3;
+
+	uint16_t	root_entry_count;
+	uint16_t	total_sectors_16;
+	uint8_t		media_type;
+
+	// align next to 26
+	uint8_t		__alignmentByte4;
+
+	uint16_t	table_size_16;
+	uint16_t	sectors_per_track;
+	uint16_t	head_side_count;
+	uint32_t 	hidden_sector_count;
+	uint32_t 	total_sectors_32;
+
+	// FAT32 specific fields
+	uint32_t	table_size_32;			// the number of SECTORS (NOT bytes!) occupied by one FAT32 FAT table
+	uint16_t	extended_flags;
+	uint16_t	fat_version;
+	uint32_t	root_cluster;
+	uint16_t	fat_info;
+	uint16_t	backup_BS_sector;
+	uint8_t 	reserved_0[12];
+	uint8_t		drive_number;
+
+	// align next to 70
+	uint8_t		__alignmentByte5;
+
+	uint8_t		reserved_1;
+	uint8_t		boot_signature;
+	uint32_t	volume_id;
+	uint8_t		volume_label[ 11 ];
+
+	// align next to 88
+	uint8_t		__alignmentByte6;
+
+	uint8_t		fat_type_label[ 8 ];
+
+	uint8_t 	boot_code[ 420 ];
+	uint16_t 	signature;
+} FAT32_BPS_INFO_STRUCT;
+
+typedef struct
+{
+	uint8_t		fileName[ 11 ];
+	uint8_t 	attributes;
+	uint8_t 	reserved;
+	uint8_t 	createdSecFract;
+	uint16_t 	creationTime;
+	uint16_t 	creationDate;
+	uint16_t 	lastAccess;
+	uint16_t 	clusterNumberHigh;
+	uint16_t 	lastModTime;
+	uint16_t 	lastModDate;
+	uint16_t 	clusterNumberLow;
+	uint32_t	fileSize;
+} FAT32_ENTRY;
+
+typedef enum
+{
+	ARCHIVE = 0,
+	DIRECTORY,
+	VOLUME
+} DIR_TYPE;
+
+// NOTE: using void* for children instead of DIR_ENTRY as this FUCKING TI compiler is not
+// capable of handling this
+typedef struct
+{
+	uint8_t		fileName[ 11 ];
+	DIR_TYPE 	type;
+	uint32_t	fileSize;
+
+	uint32_t	childrenCount;
+	void*		children;
+} DIR_ENTRY;
+
+typedef struct
+{
+
+} FILE_INFO;
+
+///////////////////////////////////////////////////////////////////
+
 // module-local data //////////////////////////////////////////////
-static PRIMARY_PARTITION_INFO_STRUCT primaryPartition;
-static FAT32_BPS_INFO_STRUCT fat32Bps;
+static PRIMARY_PARTITION_INFO_STRUCT _primaryPartition;
+static FAT32_BPS_INFO_STRUCT _fat32Bps;
+static DIR_ENTRY _fsRoot;
 
-static uint8_t dataBuffer[ DATABUFFER_SIZE ];
+static uint8_t _blocksPerSector;
 
-static uint32_t blocksPerSector;
-static uint8_t* sectorSizeBuffer;
+static uint8_t* _fatTable;
 
-static uint8_t* fatTable;
+static uint8_t* _clusterBuffer;
+static uint32_t _clusterBufferSize;
 ///////////////////////////////////////////////////////////////////
 
 // module-local functions /////////////////////////////////////////
 static uint32_t loadPrimaryPartition( void );
 static uint32_t loadFAT( void );
-static uint32_t loadDirectories( void );
+static uint32_t loadFsRoot( void );
+static uint32_t loadDirectory( uint32_t cluster, DIR_ENTRY* dir );
+static void readDirectory( uint8_t* buffer, DIR_ENTRY* dir );
 ///////////////////////////////////////////////////////////////////
 
 uint32_t
-fat32Init()
+fat32Init( void )
 {
 	// TODO: need to get an interrupt when card is inserted
 
@@ -67,10 +201,34 @@ fat32Init()
 		return 1;
 	}
 
-	if ( loadDirectories() )
+	if ( loadFsRoot() )
 	{
 		return 1;
 	}
+
+	return 0;
+}
+
+uint32_t
+fat32Open( char* fileName, FILE* file )
+{
+	// TODO: implement
+
+	return 0;
+}
+
+uint32_t
+fat32Close( FILE file )
+{
+	// TODO: implement
+
+	return 0;
+}
+
+uint32_t
+fat32Read( uint32_t nBytes, uint8_t* buffer )
+{
+	// TODO: implement
 
 	return 0;
 }
@@ -78,83 +236,59 @@ fat32Init()
 uint32_t
 loadPrimaryPartition( void )
 {
-	// read the MBR
+	uint8_t dataBuffer[ MBR_AND_BPS_SIZE ];
+	memset( dataBuffer, 0, MBR_AND_BPS_SIZE );
+
+	// read the MBR from card
 	if ( sdHalReadBlocks( 0, 1, dataBuffer ) )
 	{
 		return 1;
 	}
 
-	// check signature of MBR
-	uint16_t signature = ( dataBuffer[ BOOTSECTOR_SIGNATURE_OFFSET ] ) | ( dataBuffer[ BOOTSECTOR_SIGNATURE_OFFSET + 1 ] << 8 );
-	if ( BOOTSECTOR_SIGNATURE_VALUE != signature )
+	// check signature of MBR and reject invalid MBR signatures
+	uint16_t signature = ( dataBuffer[ MBR_SIGNATURE_OFFSET ] ) | ( dataBuffer[ MBR_SIGNATURE_OFFSET + 1 ] << 8 );
+	if ( MBR_SIGNATURE_VALUE != signature )
 	{
 		return 1;
 	}
 
-	// store primary-partition information
-	memcpy( &primaryPartition, &dataBuffer[ PRIMARY_PARTITION_OFFSET ], sizeof( primaryPartition ) );
+	// store primary-partition information in structure
+	memcpy( &_primaryPartition, &dataBuffer[ PRIMARY_PARTITION_OFFSET ], sizeof( _primaryPartition ) );
 
 	// check if primary partition is FAT32
-	if ( PRIMARY_PARTITION_FAT32_TYPE != primaryPartition.type )
+	if ( PRIMARY_PARTITION_FAT32_TYPE != _primaryPartition.type )
 	{
 		return 1;
 	}
 
-	// read first 512 bytes of primary partition, will contain the information
-	if ( sdHalReadBlocks( primaryPartition.partitionStart, 1, dataBuffer ) )
+	// read BPS of primary partition, will contain the information
+	if ( sdHalReadBlocks( _primaryPartition.partitionStart, 1, dataBuffer ) )
 	{
 		return 1;
 	}
 
-	// copy piece-wise ignoring alignment-bytes
-	memcpy( &fat32Bps, &dataBuffer, 11 );
-	memcpy( &( ( uint8_t* ) &fat32Bps )[ 12 ], &dataBuffer[ 11 ], 3 );
-	memcpy( &( ( uint8_t* ) &fat32Bps )[ 16 ], &dataBuffer[ 14 ], 3 );
-	memcpy( &( ( uint8_t* ) &fat32Bps )[ 20 ], &dataBuffer[ 17 ], 5 );
-	memcpy( &( ( uint8_t* ) &fat32Bps )[ 26 ], &dataBuffer[ 22 ], 43 );
-	memcpy( &( ( uint8_t* ) &fat32Bps )[ 70 ], &dataBuffer[ 65 ], 17 );
-	memcpy( &( ( uint8_t* ) &fat32Bps )[ 88 ], &dataBuffer[ 82 ], 512 - 82 );
+	// copy piece-wise ignoring alignment-bytes - this is a workaround of the alignment problems (see declaration of struct)
+	memcpy( &_fat32Bps, &dataBuffer, 11 );
+	memcpy( &( ( uint8_t* ) &_fat32Bps )[ 12 ], &dataBuffer[ 11 ], 3 );
+	memcpy( &( ( uint8_t* ) &_fat32Bps )[ 16 ], &dataBuffer[ 14 ], 3 );
+	memcpy( &( ( uint8_t* ) &_fat32Bps )[ 20 ], &dataBuffer[ 17 ], 5 );
+	memcpy( &( ( uint8_t* ) &_fat32Bps )[ 26 ], &dataBuffer[ 22 ], 43 );
+	memcpy( &( ( uint8_t* ) &_fat32Bps )[ 70 ], &dataBuffer[ 65 ], 17 );
+	memcpy( &( ( uint8_t* ) &_fat32Bps )[ 88 ], &dataBuffer[ 82 ], 512 - 82 );
 
 	// calculate total clusters and check if violates FAT32
-	uint32_t root_dir_sectors = ( ( fat32Bps.root_entry_count * 32 ) + ( fat32Bps.bytes_per_sector - 1 ) ) /
-					fat32Bps.bytes_per_sector;
-	uint32_t data_sectors = fat32Bps.total_sectors_16 -
-			( fat32Bps.reserved_sector_count +
-					( fat32Bps.number_fats * fat32Bps.table_size_32 ) + root_dir_sectors );
-	uint32_t total_clusters = data_sectors / fat32Bps.sectors_per_cluster;
+	uint32_t root_dir_sectors = ( ( _fat32Bps.root_entry_count * 32 ) + ( _fat32Bps.bytes_per_sector - 1 ) ) / _fat32Bps.bytes_per_sector;
+	uint32_t data_sectors = _fat32Bps.total_sectors_16 - ( _fat32Bps.reserved_sector_count + ( _fat32Bps.number_fats * _fat32Bps.table_size_32 ) + root_dir_sectors );
+	uint32_t total_clusters = data_sectors / _fat32Bps.sectors_per_cluster;
 
-	// ERROR: this is a FAT12 filesystem
-	if ( total_clusters < 4085 )
+	// ERROR: this is not a FAT32 system
+	if ( total_clusters < FAT32_MIN_CLUSTER_COUNT )
 	{
 		return 1;
 	}
-	else
-	{
-		// ERROR: this is a FAT16 filesystem
-	   if ( total_clusters < 65525)
-	   {
-		   return 1;
-	   }
-	}
 
-	// allocate buffer to read one sector
-	if ( DATABUFFER_SIZE == fat32Bps.bytes_per_sector )
-	{
-		// if a sector is exactly 512 bytes in size, then use the global databuffer (this is the most likely case in FAT32)
-		sectorSizeBuffer = dataBuffer;
-		// sector consists of exactly 1 block (of 512 bytes)
-		blocksPerSector = 1;
-	}
-	else
-	{
-		// if a sector is larger than 512 bytes in size, then allocate the required buffer size
-		sectorSizeBuffer = malloc( fat32Bps.bytes_per_sector );
-		blocksPerSector = fat32Bps.bytes_per_sector / DATABUFFER_SIZE;
-		if ( fat32Bps.bytes_per_sector % DATABUFFER_SIZE )
-		{
-			blocksPerSector++;
-		}
-	}
+	// will always be a division without rest as bytes_per_sector is either 512, 1024, 2048 or 4096
+	_blocksPerSector = _fat32Bps.bytes_per_sector / SD_CARD_BLOCK_SIZE;
 
 	return 0;
 }
@@ -162,14 +296,15 @@ loadPrimaryPartition( void )
 uint32_t
 loadFAT( void )
 {
-	uint32_t first_fat_sector = primaryPartition.partitionStart +
-			fat32Bps.reserved_sector_count;
+	uint32_t fatTableSize = _fat32Bps.table_size_32 * _fat32Bps.bytes_per_sector;
+	uint32_t firstFatSector = _primaryPartition.partitionStart + _fat32Bps.reserved_sector_count;
 
 	// allocate memory to hold the complete fat-table
-	// TODO: this malloc fails
-	fatTable = malloc( fat32Bps.table_size_32 * fat32Bps.bytes_per_sector );
+	_fatTable = malloc( fatTableSize );
+	memset( _fatTable, 0, fatTableSize );
+
 	// read the complete fat-table in one step
-	if ( sdHalReadBlocks( first_fat_sector, fat32Bps.table_size_32, fatTable ) )
+	if ( sdHalReadBlocks( firstFatSector, _fat32Bps.table_size_32 * _blocksPerSector, _fatTable ) )
 	{
 		return 1;
 	}
@@ -178,17 +313,117 @@ loadFAT( void )
 }
 
 uint32_t
-loadDirectories( void )
+loadFsRoot( void )
 {
-	uint32_t first_data_sector = primaryPartition.partitionStart +
-				fat32Bps.reserved_sector_count +
-				( fat32Bps.number_fats * fat32Bps.table_size_32 );
+	uint32_t firstDataSector = _primaryPartition.partitionStart + _fat32Bps.reserved_sector_count + ( _fat32Bps.number_fats * _fat32Bps.table_size_32 );
 
-	// read the first data-sector
-	if ( sdHalReadBlocks( first_data_sector, 1, sectorSizeBuffer ) )
+	// allocate memory to hold one complete cluster
+	_clusterBufferSize = _fat32Bps.bytes_per_sector * _fat32Bps.sectors_per_cluster;
+	_clusterBuffer = malloc( _clusterBufferSize );
+	memset( _clusterBuffer, 0, _clusterBufferSize );
+
+	if ( loadDirectory( firstDataSector, &_fsRoot ) )
 	{
 		return 1;
 	}
 
 	return 0;
+}
+
+uint32_t
+loadDirectory( uint32_t cluster, DIR_ENTRY* dir )
+{
+	// read the complete first cluster
+	if ( sdHalReadBlocks( cluster, _fat32Bps.sectors_per_cluster * _blocksPerSector, _clusterBuffer ) )
+	{
+		return 1;
+	}
+
+	readDirectory( _clusterBuffer, dir );
+
+	return 0;
+}
+
+void
+readDirectory( uint8_t* buffer, DIR_ENTRY* dir )
+{
+	uint32_t i = 0;
+	uint32_t childIndex = 0;
+	uint32_t bytesPerCluster = _fat32Bps.sectors_per_cluster * _fat32Bps.bytes_per_sector;
+
+	for ( i = 0; i < bytesPerCluster; i += 32 )
+	{
+		// ignore unused files
+		if ( DIRECTORY_UNUSED == buffer[ i ] )
+		{
+			continue;
+		}
+		else if ( DIRECTORY_END == buffer[ i ] )
+		{
+			// reached end of directory, stop iterating through data
+			break;
+		}
+
+		FAT32_ENTRY* fat32Entry = ( FAT32_ENTRY* ) &buffer[ i ];
+
+		if ( DIR_ATTRIB_HIDDEN & fat32Entry->attributes || DIR_ATTRIB_SYSTEM & fat32Entry->attributes )
+		{
+			// ignore hidden or system files
+			continue;
+		}
+
+		if ( DIR_ATTRIB_VOLID & fat32Entry->attributes )
+		{
+			// NOTE: this is a hack to store the VolumeID in the root of the FS
+			memcpy( dir->fileName, fat32Entry->fileName, sizeof( fat32Entry->fileName ) );
+			dir->type = VOLUME;
+
+			// ignore volume-id
+			continue;
+		}
+
+		dir->childrenCount++;
+	}
+
+	dir->children = malloc( dir->childrenCount * sizeof( DIR_ENTRY ) );
+	memset( dir->children, 0, dir->childrenCount * sizeof( DIR_ENTRY ) );
+
+	for ( i = 0; i < bytesPerCluster; i += 32 )
+	{
+		// ignore unused files
+		if ( DIRECTORY_UNUSED == buffer[ i ] )
+		{
+			continue;
+		}
+		else if ( DIRECTORY_END == buffer[ i ] )
+		{
+			// reached end of directory, stop iterating through data
+			break;
+		}
+
+		FAT32_ENTRY* fat32Entry = ( FAT32_ENTRY* ) &buffer[ i ];
+
+		if ( DIR_ATTRIB_HIDDEN & fat32Entry->attributes ||
+				 DIR_ATTRIB_SYSTEM & fat32Entry->attributes ||
+				 DIR_ATTRIB_VOLID & fat32Entry->attributes )
+		{
+			// ignore hidden/system/volume-id files
+			continue;
+		}
+
+		if ( DIR_ATTRIB_DIRECTORY & fat32Entry->attributes )
+		{
+			( ( DIR_ENTRY* ) dir->children )[ childIndex ].type = DIRECTORY;
+		}
+
+		if ( DIR_ATTRIB_ARCHIVE & fat32Entry->attributes )
+		{
+			( ( DIR_ENTRY* ) dir->children )[ childIndex ].type = ARCHIVE;
+		}
+
+		( ( DIR_ENTRY* ) dir->children )[ childIndex ].fileSize = fat32Entry->fileSize;
+		memcpy( ( ( DIR_ENTRY* ) dir->children )[ childIndex ].fileName, fat32Entry->fileName, sizeof( fat32Entry->fileName ) );
+
+		++childIndex;
+	}
 }

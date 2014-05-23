@@ -82,6 +82,10 @@ initOs( void )
 		return 1;
 	}
 
+	if(mmu_init()) {
+
+	}
+
 	if ( irqInit() )
 	{
 		return 1;

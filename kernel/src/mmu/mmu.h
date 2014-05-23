@@ -1,21 +1,36 @@
 /*
  * mmu.h
  *
- *  Created on: 18.04.2014
+ *  Created on: 23.05.2014
  *      Author: faisstm
  */
 
 #ifndef MMU_H_
 #define MMU_H_
 
+#include <stdlib.h>
 #include <inttypes.h>
+#include <string.h>
 
-#define FAULT 0
-#define COARSE 1
-#define MASTER 2
+typedef enum {
+	FAULT,
+	MASTER,
+	COARSE
+} PageTableType;
 
-#define COARSE_NR_OF_PTES 256
-#define MASTER_NR_OF_PTES 4096
+typedef enum {
+	NoAccessTwiceBitch = 0,
+	ReadWriteNoAccess,
+	ReadWriteReadOnly,
+	ReadWriteTwiceBitch
+} AccessProtectionType;
+
+typedef enum {
+	NotCachedNotBuffered = 0,
+	NotCachedBuffered,
+	WriteThrough,
+	WriteBack
+} CacheType;
 
 /* First 2 chars for privileged mode, second 2 chars for user mode */
 /* NA = no access, RO = read only, RW = read and write */
@@ -29,46 +44,24 @@
 #define WT 0x02		// write through cached
 #define WB 0x03		// write back cached
 
-#define LARGEPAGE 64
-#define SMALLPAGE 4
-
-#define DOM3CLT 0x00000040
-#define CHANGEALLDOM 0xFFFFFFFF
-
-#define ENABLEMMU 0x0001
-#define ENABLEDCACHE 0x0004
-#define ENABLEICACHE 0x1000
-#define CHANGEMMU 0x0001
-#define CHANGEDCACHE 0x0004
-#define CHANGEICACHE 0x1000
-
+typedef struct {
+	uint32_t vAddress;				// virtuelle Startadresse des Bereiches den diese Pagetable übernimmt
+	uint32_t ptAddress;				// virtuelle Adresse der Pagetable
+	uint32_t ptAddressPhysical;		// physische Adresse der Pagetable
+	PageTableType type;					// pagetable type
+	uint8_t domain;
+} Pagetable;
 
 typedef struct {
+	uint32_t vAddress;				// virtuelle Startadresse der Region
+	uint32_t physicalStartAdress;	// physische Startadresse der Region
+	uint16_t pageSize;				// page size
+	uint16_t numPages;				// anzahl der pages in region
+	AccessProtectionType AP;		// access permission
+	CacheType CB;					// cache and write buffer attributes
+	PageTableType ptType;
+} Region;
 
-	uint32_t vAddress; 			// virtual Address
-	uint32_t ptAddress; 		// address of page table
-	uint32_t masterPTAdress; 	// address of master pagetable, if l1 table this = ptAddress
-	uint32_t type; 				// coarse, master or fault
-	uint32_t dom; 				// domain
-
-} Pagetable_t;
-
-typedef struct {
-	uint32_t vAddress; 	// virtual Address
-	uint32_t pageSize;  // size of virtual page
-	uint32_t numPages;	// number of pages
-	uint32_t AP;		// access permission
-	uint32_t CB;		// cache and write buffer attributes
-	uint32_t pAddress;	// virtual Address
-	Pagetable_t *pt;	// pointer to page table
-} Region_t;
-
-uint32_t mmuInit(void);
-uint8_t mmuMapRegion(Region_t * region);
-
-/* ttb Functions */
-void ttbSet(unsigned int ttb);
-void tlbFlush(void);
-void setProcessID(unsigned int pid);
+uint32_t mmu_init(void);
 
 #endif /* MMU_H_ */

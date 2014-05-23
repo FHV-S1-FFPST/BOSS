@@ -12,6 +12,7 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <ctype.h>
 
 // module defines //////////////////////////////////////////////
 #define SD_CARD_BLOCK_SIZE				512
@@ -138,21 +139,17 @@ typedef enum
 
 // NOTE: using void* for children instead of DIR_ENTRY as this FUCKING TI compiler is not
 // capable of handling this
-typedef struct
+typedef struct __DIR_ENTRY
 {
-	char		fileName[ 12 ];
-	DIR_TYPE 	type;
-	uint32_t 	clusterNumber;
-	uint32_t	fileSize;
+	char				fileName[ 12 ];
+	DIR_TYPE 			type;
+	uint32_t 			clusterNumber;
+	uint32_t			fileSize;
 
-	int32_t		childrenCount;
-	void*		children;
+	int32_t					childrenCount;
+	struct __DIR_ENTRY*		children;
 } DIR_ENTRY;
 
-typedef struct
-{
-
-} FILE_INFO;
 
 ///////////////////////////////////////////////////////////////////
 
@@ -237,7 +234,7 @@ fat32Close( FILE file )
 }
 
 uint32_t
-fat32Read( uint32_t nBytes, uint8_t* buffer )
+fat32Read( FILE file, uint32_t nBytes, uint8_t* buffer )
 {
 	// TODO: implement
 
@@ -490,36 +487,41 @@ readDirectory( uint8_t* buffer, DIR_ENTRY* dir )
 
 		if ( DIR_ATTRIB_DIRECTORY & fat32Entry->attributes )
 		{
-			( ( DIR_ENTRY* ) dir->children )[ childIndex ].type = DIRECTORY;
-			( ( DIR_ENTRY* ) dir->children )[ childIndex ].childrenCount = -1; // set to -1 to mark as not loaded yet - will be done lazily when searching through the filesystem during open file
+			dir->children[ childIndex ].type = DIRECTORY;
+			dir->children[ childIndex ].childrenCount = -1; // set to -1 to mark as not loaded yet - will be done lazily when searching through the filesystem during open file
 		}
 
 		if ( DIR_ATTRIB_ARCHIVE & fat32Entry->attributes )
 		{
-			( ( DIR_ENTRY* ) dir->children )[ childIndex ].type = ARCHIVE;
+			dir->children[ childIndex ].type = ARCHIVE;
 		}
 
-		( ( DIR_ENTRY* ) dir->children )[ childIndex ].fileSize = fat32Entry->fileSize;
-		( ( DIR_ENTRY* ) dir->children )[ childIndex ].clusterNumber = ( fat32Entry->clusterNumberHigh << 0x10 ) | fat32Entry->clusterNumberLow;
+		dir->children[ childIndex ].fileSize = fat32Entry->fileSize;
+		dir->children[ childIndex ].clusterNumber = ( fat32Entry->clusterNumberHigh << 0x10 ) | fat32Entry->clusterNumberLow;
 
+		uint8_t c = 0;
+		uint8_t cDir = 0;
+		bool foundSpace = FALSE;
 
-		char* firstSpace = strchr( fat32Entry->fileName, ' ' );
-		if ( firstSpace )
+		for ( c = 0; c < sizeof( fat32Entry->fileName ); ++c )
 		{
-			char* lastSpace = strrchr( fat32Entry->fileName, ' ' );
-		}
-		else
-		{
-			// TODO: handle filenames without endings:
-			// xy.txt
-			// xy
+			if ( ' ' == fat32Entry->fileName[ c ] )
+			{
+				foundSpace = TRUE;
+			}
+			else
+			{
+				if ( foundSpace )
+				{
+					dir->children[ childIndex ].fileName[ cDir ] = '.';
+					++cDir;
+					foundSpace = FALSE;
+				}
 
-			memcpy( ( ( DIR_ENTRY* ) dir->children )[ childIndex ].fileName, fat32Entry->fileName, 8 );
-			( ( DIR_ENTRY* ) dir->children )[ childIndex ].fileName[ 8 ] = '.';
-			memcpy( &( ( DIR_ENTRY* ) dir->children )[ childIndex ].fileName[ 9 ], &fat32Entry->fileName[ 8 ], 3 );
+				dir->children[ childIndex ].fileName[ cDir ] = tolower( fat32Entry->fileName[ c ] );
+				++cDir;
+			}
 		}
-
-		// TODO: transform to lower-case
 
 		++childIndex;
 	}

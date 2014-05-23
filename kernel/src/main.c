@@ -113,30 +113,30 @@ initDrivers( void )
 	}
 
 	FILE boss = 0;
-	FILE bossDir = 0;
-	FILE bossSub = 0;
+	FILE bossTxt = 0;
+	FILE bossDirTxt = 0;
+	FILE bossSubTxt = 0;
 	FILE bossDir2 = 0;
+	uint32_t ret = 0;
 
-	if ( fat32Open( "boss.txt", &boss ) )
-	{
-		return 1;
-	}
+	uint8_t buffer[ 512 ];
 
-	if ( fat32Open( "bossdir/bossdir.txt", &bossDir ) )
-	{
-		return 1;
-	}
-
-	if ( fat32Open( "bossdir/bosssub/bosssub.txt", &bossSub ) )
-	{
-		return 1;
-	}
-
+	ret = fat32Open( "BOSS", &boss );
+	ret = fat32Open( "BOSS.txt", &bossTxt );
+	ret = fat32Open( "bossdir/bossdir.txt", &bossDirTxt );
+	ret = fat32Open( "bossdir/Bosssub/bosssub.txt", &bossSubTxt );
 	// should fail - cannot open a directory
-	if ( fat32Open( "BossDir2", &bossDir2 ) )
-	{
-		return 1;
-	}
+	ret = fat32Open( "BossDir2", &bossDir2 );
+
+	ret = fat32Read( boss, 512, buffer );
+	ret = fat32Read( bossTxt, 512, buffer );
+	ret = fat32Read( bossDirTxt, 512, buffer );
+	ret = fat32Read( bossSubTxt, 512, buffer );
+
+	ret = fat32Close( boss );
+	ret = fat32Close( bossTxt );
+	ret = fat32Close( bossDirTxt );
+	ret = fat32Close( bossSubTxt );
 
 	return 0;
 }

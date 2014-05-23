@@ -10,43 +10,38 @@
 
 #include <inttypes.h>
 
-// NOTE: starts at offset 0 in BIOS PARAMETER BLOCK
-typedef struct
-{
-	uint8_t  BS_jmpBoot[ 3 ];
-	uint8_t	 BS_OEMName[ 8 ];
-	uint16_t BPB_BytsPerSec;
-	uint8_t  BPB_SecPerClus;
-	uint16_t BPB_RsvdSecCnt;
-	uint8_t  BPB_NumFATs;
-	uint16_t BPB_RootEntCnt;
-	uint16_t BPB_TotSec16;
-	uint8_t  BPB_Media;
-	uint16_t BPB_FATSz16;
-	uint16_t BPB_SecPerTrk;
-	uint16_t BPB_NumHeads;
-	uint32_t BPB_HiddSec;
-	uint32_t BPB_TotSec32;
-} GLOBAL_BPS_STRUCT;
+typedef int32_t file_id;
 
-// NOTE: starts at offset 36 in BIOS PARAMETER BLOCK
-typedef struct
-{
-	uint32_t BPB_FATSz32;
-	uint16_t BPB_ExtFlags;
-	uint16_t BPB_FSVer;
-	uint32_t BPB_RootClus;
-	uint16_t BPB_FSInfo;
-	uint16_t BPB_BkBootSec;
-	uint32_t BPB_Reserved[ 3 ];
-	uint8_t	 BS_DrvNum;
-	uint8_t  BS_Reserved1;
-	uint8_t  BS_BootSig;
-	uint32_t BS_VolID;
-	uint8_t	 BS_VolLab[ 11 ];
-	uint8_t	 BS_FilSysType[ 8 ];
-} FAT32_BPS_STRUCT;
+/**
+ * Initializes the FAT32.
+ * Returns 0 upon success.
+ * Returns 1 upon failure.
+ */
+uint32_t fat32Init( void );
 
-uint32_t fat32Init();
+/**
+ * Opens a file (for reading only) from the filePath.
+ * Returns 0 upon success, where file will contain a valid FILE pointer.
+ * Returns 1 upon failure, where file will not be changed.
+ */
+uint32_t fat32Open( const char* filePath, file_id* fileId );
+/**
+ * Closes a previously opened file.
+ * Returns 0 upon success.
+ * Returns 1 if not opened or invalid fileid.
+ */
+uint32_t fat32Close( file_id fileId );
+
+/**
+ * Reads up to nBytes into buffer from file.
+ * Returns the number of bytes actually read or -1 if failure or 0 if EOF has reached already during a previous read.
+ *
+ * HINT: read always less than 512 bytes as it is much faster.
+ * A test reading a 5MB MP3 file delivered:
+ * 133bytes: 8.3 sec
+ * 510bytes: 7.5 sec
+ * 512,1024,496 bytes: 13.9sec
+ */
+int32_t fat32Read( file_id fileId, uint32_t nBytes, uint8_t* buffer );
 
 #endif /* FAT32_H_ */

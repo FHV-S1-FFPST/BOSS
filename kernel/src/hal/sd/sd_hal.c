@@ -62,6 +62,7 @@ static uint32_t sendCmd6( uint32_t arg );
 static uint32_t sendCmd7( void );
 static uint32_t sendCmd8( void );
 static uint32_t sendCmd9( void );
+static uint32_t sendCmd12( void );
 static uint32_t sendCmd16( void );
 static uint32_t sendCmd18( uint32_t addr, uint32_t nblk );
 static uint32_t sendCmd17( uint32_t addr );
@@ -176,6 +177,7 @@ static uint32_t sendACmd51();
 #define MMCHS_CMD_CCCE_BIT 							0x80000
 #define MMCHS_CMD_CICE_BIT 							0x100000
 #define MMCHS_CMD_DP_BIT 							0x200000
+#define MMCHS_CMD_TYPE_BIT_START					22
 #define MMCHS_CMD_INDX_BIT_START					24
 #define MMCHS_CMD_INDX_BITS( cmd )					( cmd & 0x3F ) << MMCHS_CMD_INDX_BIT_START
 
@@ -205,7 +207,7 @@ static uint32_t sendACmd51();
 #define SDMMC_CONTROLLER_CLOCK	96000000		// BEAGLEBONE SD/MMC controller has a clock of 48MHz. see BBSRM_lates page 24. BUT OMAP35x.pdf says 96MHz at page 3143 22.3.1.1.1 Module Clocks
 #define SDMMC_BUS_CLOCK			400000			// BEAGLEBONE SD/MMC bus has a clock of 400KHz. see ?
 
-// TODO: this should be moved to a different module //////////////////////////////////////////
+////////////////////////////////////////////
 // NOTE: see OMAP35x.pdf page 452
 #define CORE_CM_ADDR 					0x48004A00
 #define CONTROL_PADCONF_MMC1_ADDR		0x48002144
@@ -361,6 +363,14 @@ sdHalReadBlocks( uint32_t block, uint32_t nblk, uint8_t* buffer )
 	if ( readTransferBuffer( nBytes, buffer ) )
 	{
 		return 1;
+	}
+
+	if ( 1 < nblk )
+	{
+		if ( sendCmd12() )
+		{
+			return 1;
+		}
 	}
 
 	// transfer complete, no error occured
@@ -571,7 +581,6 @@ sendInitStream( void )
 	BIT_SET( MMCHS_CON, MMCHS_CON_INIT_BIT );
 	MMCHS_CMD = 0x0;
 
-	// TODO: wait until command is completed
 	// WAIT 1ms to allow card initializing internal state
 	uint64_t sysMillis = getSysMillis();
 	while ( 1 > getSysMillis() - sysMillis ) { }
@@ -781,7 +790,7 @@ configBusWidth()
 uint32_t
 configTransferSpeed()
 {
-	uint32_t arg = ((SD_SWITCH_MODE & SD_CMD6_GRP1_SEL) | (SD_CMD6_GRP1_HS));
+	uint32_t arg = ( ( SD_SWITCH_MODE & SD_CMD6_GRP1_SEL ) | ( SD_CMD6_GRP1_HS ) );
 
 	if ( sendCmd6( arg ) )
 	{
@@ -835,21 +844,20 @@ readTransferBuffer( uint32_t nBytes, uint8_t* buffer )
 		{
 			uint32_t i = 0;
 
-			clearBufferReadReady();
-
 			for ( i = 0; i < nBytes; i += 4 )
 			{
 				// NOTE: read 4bytes of data from data-address, will be moved by controller automatically
 				volatile uint32_t data = MMCHS_DATA;
 
-				buffer[ i + 0 ] = 0xFF & ( data >> 0 );
-				buffer[ i + 1 ] = 0xFF & ( data >> 8 );
-				buffer[ i + 2 ] = 0xFF & ( data >> 16 );
-				buffer[ i + 3 ] = 0xFF & ( data >> 24 );
+				buffer[ i + 0 ] = *( ( uint8_t* ) &data + 0 );
+				buffer[ i + 1 ] = *( ( uint8_t* ) &data + 1 );
+				buffer[ i + 2 ] = *( ( uint8_t* ) &data + 2 );
+				buffer[ i + 3 ] = *( ( uint8_t* ) &data + 3 );
 			}
-		}
 
-		// TODO: if Auto CMD12 is enabled (MMCi.MMCHS_CMD[2] ACEN bit to 0x1) then nothing has to be done, otherwise CMD12 needs to be sent now
+			// clear flag AFTER all data was read because will be asserted after having read the whole buffer
+			clearBufferReadReady();
+		}
 
 		// NOTE: for dependencies between error flags and transfer complete in MMCHS_STAT see page 3157
 		if ( isTransferComplete() )
@@ -1137,7 +1145,7 @@ sendCmd3( void )
 	// NOTE: This command sets MMC card address (see Table 22-19). Useful when MMCHS controller switches to addressed mode (see OMAP35x.pdf page 3182)
 
 	MMCHS_IE = MMCHS_IE_CERR_BIT | MMCHS_IE_CIE_BIT | MMCHS_IE_CCRC_BIT | MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CEB_BIT;
-	MMCHS_ARG = 0x00010000; // TODO: make it nice: the MMC cards address
+	MMCHS_ARG = 0x0;
 	MMCHS_CMD =	MMCHS_CMD_INDX_BITS( 3 ) | MMCHS_CMD_RSP_TYPE_48_BIT | MMCHS_CMD_CICE_BIT | MMCHS_CMD_CCCE_BIT;
 
 	return awaitCommandResponse();
@@ -1249,6 +1257,24 @@ sendCmd9( void )
 	return awaitCommandResponse();
 }
 
+/** NOTE: STOP_TRANSMISSION
+ * Forces the card to stop transmission.
+ *
+ * type:	ac
+ * resp:	R1b (busy!)
+ * arg:		[31:0] stuff bits
+ */
+uint32_t
+sendCmd12( void )
+{
+	// NOTE: seems to work without it for now
+
+	MMCHS_IE = MMCHS_IE_CCRC_BIT | MMCHS_IE_CC_BIT | MMCHS_IE_CTO_BIT | MMCHS_IE_CEB_BIT;
+	MMCHS_ARG = 0x0;
+	MMCHS_CMD = MMCHS_CMD_INDX_BITS( 12 ) | MMCHS_CMD_RSP_TYPE_48BUSY_BIT | MMCHS_CMD_CCCE_BIT | 0x3 << MMCHS_CMD_TYPE_BIT_START;
+
+	return awaitCommandResponse();
+}
 
 /* NOTE: SET_BLOCKLEN
  * In the case of a Standard Capacity SD Memory Card, this command sets the block length (in bytes) for all following
@@ -1288,11 +1314,10 @@ sendCmd17( uint32_t addr )
 	MMCHS_ARG = addr;	// address
 	MMCHS_BLK = ( 1 << 16 ) | ( BLOCK_LEN ); // read one block. starts at bit 16, bit 0-15 contains block-size and is ALWAYS set to 512
 	setDataTimeout( 27 );
-	MMCHS_CMD = MMCHS_CMD_INDX_BITS( 17 ) | MMCHS_CMD_RSP_TYPE_48_BIT | MMCHS_CMD_CICE_BIT | MMCHS_CMD_DP_BIT | MMCHS_CMD_DDIR_BIT | MMCHS_CMD_CCCE_BIT /*| MMCHS_CMD_ACEN_BIT*/;
+	MMCHS_CMD = MMCHS_CMD_INDX_BITS( 17 ) | MMCHS_CMD_RSP_TYPE_48_BIT | MMCHS_CMD_CICE_BIT | MMCHS_CMD_DP_BIT | MMCHS_CMD_DDIR_BIT | MMCHS_CMD_MSBS_BIT | MMCHS_CMD_BCE_BIT | MMCHS_CMD_CCCE_BIT;
 
 	return awaitCommandResponse();
 }
-
 
 /* NOTE: READ_MULTIPLE_BLOCK
  * Continuously transfers data blocks from card to host until interrupted by a STOP_TRANSMISSION command.
@@ -1311,7 +1336,9 @@ sendCmd18( uint32_t addr, uint32_t nblk )
 	MMCHS_ARG = addr;	// address
 	MMCHS_BLK = ( nblk << 16 ) | ( BLOCK_LEN ); // write number of blocks/bytes to read. starts at bit 16, bit 0-15 contains block-size and is ALWAYS set to 512
 	setDataTimeout( 27 );
-	MMCHS_CMD = MMCHS_CMD_INDX_BITS( 18 ) | MMCHS_CMD_RSP_TYPE_48_BIT | MMCHS_CMD_CICE_BIT | MMCHS_CMD_DP_BIT | MMCHS_CMD_MSBS_BIT | MMCHS_CMD_BCE_BIT /*| MMCHS_CMD_ACEN_BIT */ | MMCHS_CMD_DDIR_BIT | MMCHS_CMD_CCCE_BIT;
+	MMCHS_CMD = MMCHS_CMD_INDX_BITS( 18 ) | MMCHS_CMD_RSP_TYPE_48_BIT | MMCHS_CMD_CICE_BIT | MMCHS_CMD_DP_BIT |
+			MMCHS_CMD_DDIR_BIT | MMCHS_CMD_MSBS_BIT | MMCHS_CMD_BCE_BIT | MMCHS_CMD_CCCE_BIT |
+			/*MMCHS_CMD_ACEN_BIT */ 0x3 << MMCHS_CMD_TYPE_BIT_START;
 
 	return awaitCommandResponse();
 }

@@ -116,6 +116,75 @@ initDrivers( void )
 		return 1;
 	}
 
+	/* FAT32 testing and using code
+	#include <stdlib.h>
+	#include <string.h>
+	#define BUFFER_SIZE 1024
+
+	file_id boss = 0;
+	file_id bossTxt = 0;
+	file_id bossDirTxt = 0;
+	file_id bossSubTxt = 0;
+	file_id mp3File01 = 0;
+	file_id mp3File08 = 0;
+	int32_t ret = 0;
+
+	uint8_t* buffer = ( uint8_t* ) malloc( BUFFER_SIZE );
+	memset( buffer, 0, BUFFER_SIZE );
+
+	// should fail, doesnt exist
+	ret = fat32Open( "BOSSTxt", &boss );
+	// should fail - cannot open a directory
+	ret = fat32Open( "BossDir2", &boss );
+
+	ret = fat32Open( "BOSS", &boss );
+	ret = fat32Open( "BOSS.txt", &bossTxt );
+	ret = fat32Open( "bossdir/bossdir.txt", &bossDirTxt );
+	ret = fat32Open( "bossdir/Bosssub/bosssub.txt", &bossSubTxt );
+	ret = fat32Open( "BigFiles/01.mp3", &mp3File01 );
+	ret = fat32Open( "BigFiles/08.mp3", &mp3File08 );
+
+	ret = fat32Read( boss, BUFFER_SIZE, buffer );
+	ret = fat32Read( bossTxt, BUFFER_SIZE, buffer );
+	ret = fat32Read( bossDirTxt, BUFFER_SIZE, buffer );
+	ret = fat32Read( bossSubTxt, BUFFER_SIZE, buffer );
+
+	uint64_t ms = getSysMillis();
+
+	while ( 1 )
+	{
+		ret = fat32Read( mp3File01, BUFFER_SIZE, buffer );
+		if ( BUFFER_SIZE != ret )
+		{
+			break;
+		}
+	}
+
+	ms = getSysMillis( ) - ms;
+
+	ms = getSysMillis();
+
+	while ( 1 )
+	{
+		ret = fat32Read( mp3File08, BUFFER_SIZE, buffer );
+		if ( BUFFER_SIZE != ret )
+		{
+			break;
+		}
+	}
+
+	ms = getSysMillis( ) - ms;
+
+	ret = fat32Close( boss );
+	ret = fat32Close( bossTxt );
+	ret = fat32Close( bossDirTxt );
+	ret = fat32Close( bossSubTxt );
+	ret = fat32Close( mp3File01 );
+	ret = fat32Close( mp3File08 );
+
+	free( buffer );
+	*/
+
 	return 0;
 }
 

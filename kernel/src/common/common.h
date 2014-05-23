@@ -24,11 +24,4 @@ typedef uint8_t bool;
 #define BIT_CLEAR_ALL( val ) ( val = 0x0 )
 #define BIT_CHECK( val, bits ) ( ( val & bits ) == bits )
 
-// TODO: add max retries to prevent endless loops!
-/* DON'T USE: DEPRECATED
-#define AWAIT_BITS_SET( val, bits ) while ( ( val & bits ) != bits ) {}
-#define AWAIT_BITS_CLEARED( val, bits ) while ( val & bits ) {}
-#define AWAIT_BITS_ALL_CLEARED( val ) while ( val ) {}
-*/
-
 #endif /* COMMON_H_ */

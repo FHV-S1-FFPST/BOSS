@@ -17,14 +17,14 @@ uint32_t mmu_init(void) {
 
 	Pagetable masterPT;
 	masterPT.vAddress = 0x00000000;
-	masterPT.ptAddress = 0x02001000;
+	masterPT.ptAddress = 0x00100000;
 	masterPT.ptAddressPhysical = ptArea;
 	masterPT.type = MASTER;
 
 	Region osRegion;
 	osRegion.pageSize = 1024;
 	osRegion.numPages = 32;
-	osRegion.vAddress = 0x00501000;
+	osRegion.vAddress = 0x00600000;
 	osRegion.physicalStartAdress = 0x80500000;
 	osRegion.AP = ReadWriteNoAccess;
 	osRegion.CB = WriteThrough;

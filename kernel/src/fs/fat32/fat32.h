@@ -10,7 +10,7 @@
 
 #include <inttypes.h>
 
-typedef uint32_t FILE;
+typedef int32_t file_id;
 
 /**
  * Initializes the FAT32.
@@ -20,22 +20,22 @@ typedef uint32_t FILE;
 uint32_t fat32Init( void );
 
 /**
- * Opens a file (for reading only) at the filePath.
+ * Opens a file (for reading only) from the filePath.
  * Returns 0 upon success, where file will contain a valid FILE pointer.
  * Returns 1 upon failure, where file will not be changed.
  */
-uint32_t fat32Open( const char* filePath, FILE* file );
+uint32_t fat32Open( const char* filePath, file_id* fileId );
 /**
  * Closes a previously opened file.
  * Returns 0 upon success.
- * Returns 1 upon failure.
+ * Returns 1 if not opened or invalid fileid.
  */
-uint32_t fat32Close( FILE file );
+uint32_t fat32Close( file_id fileId );
 
 /**
- * Reads nBytes into buffer from file.
- * Returns the number of bytes actually read or -1 if failure or 0 if EOF has reached already in a previous read.
+ * Reads up to nBytes into buffer from file.
+ * Returns the number of bytes actually read or -1 if failure or 0 if EOF has reached already during a previous read.
  */
-uint32_t fat32Read( FILE file, uint32_t nBytes, uint8_t* buffer );
+int32_t fat32Read( file_id fileId, uint32_t nBytes, uint8_t* buffer );
 
 #endif /* FAT32_H_ */

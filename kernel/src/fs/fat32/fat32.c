@@ -11,10 +11,13 @@
 #include "../../common/common.h"
 
 #include <string.h>
+#include <strings.h>
 #include <stdlib.h>
 #include <ctype.h>
 
 // module defines //////////////////////////////////////////////
+#define MAX_FILE_DESCRIPTORS			16
+
 #define SD_CARD_BLOCK_SIZE				512
 
 #define MBR_AND_BPS_SIZE				0x200
@@ -34,8 +37,17 @@
 #define DIR_ATTRIB_HIDDEN			0x2
 #define DIR_ATTRIB_SYSTEM			0x4
 #define DIR_ATTRIB_VOLID			0x8
+#define DIR_ATTRIB_LONG_NAME		0xF
 #define DIR_ATTRIB_DIRECTORY		0x10
 #define DIR_ATTRIB_ARCHIVE			0x20
+
+#define IS_READONLY( attrib ) 		( DIR_ATTRIB_READONLY & attrib )
+#define IS_HIDDEN( attrib )			( DIR_ATTRIB_HIDDEN & attrib )
+#define IS_SYSTEM( attrib )			( DIR_ATTRIB_SYSTEM & attrib )
+#define IS_VOLUMEID( attrib )		( DIR_ATTRIB_VOLID & attrib )
+#define IS_LONGNAME( attrib ) 		( ( DIR_ATTRIB_LONG_NAME & attrib ) == DIR_ATTRIB_LONG_NAME )
+#define IS_DIRECTORY( attrib )		( DIR_ATTRIB_DIRECTORY & attrib )
+#define IS_FILE( attrib )			( DIR_ATTRIB_ARCHIVE & attrib )
 ///////////////////////////////////////////////////////////////////
 
 // module-local structures
@@ -137,44 +149,60 @@ typedef enum
 	VOLUME
 } DIR_TYPE;
 
-// NOTE: using void* for children instead of DIR_ENTRY as this FUCKING TI compiler is not
-// capable of handling this
 typedef struct __DIR_ENTRY
 {
 	char				fileName[ 12 ];
 	DIR_TYPE 			type;
-	uint32_t 			clusterNumber;
+	uint32_t 			startClusterNumber;
 	uint32_t			fileSize;
 
 	int32_t					childrenCount;
 	struct __DIR_ENTRY*		children;
 } DIR_ENTRY;
 
+typedef struct
+{
+	DIR_ENTRY* 	dirEntry;
 
+	uint8_t*	currentClusterBuffer;
+
+	uint8_t* 	currentFatSectorBuffer;
+	uint32_t	currentFatSectorLba;
+
+	uint32_t 	currentCluster;
+	uint32_t 	clusterCursor;
+	uint32_t 	fileCursor;
+} FILE_DESCRIPTOR;
 ///////////////////////////////////////////////////////////////////
 
 // module-local data //////////////////////////////////////////////
+// global structures and data
 static PRIMARY_PARTITION_INFO_STRUCT _primaryPartition;
 static FAT32_BPS_INFO_STRUCT _fat32Bps;
 static DIR_ENTRY _fsRoot;
+static FILE_DESCRIPTOR _fileDescriptors[ MAX_FILE_DESCRIPTORS ];
 
-static uint8_t _blocksPerSector;
-
-static uint8_t* _fatTable;
-
+// global buffers
 static uint8_t* _clusterBuffer;
-static uint32_t _clusterBufferSize;
 
+/// global constants
+static uint32_t _clusterBufferSize;
+static uint8_t _blocksPerSector;
+static uint32_t _bytesPerCluster;
 static uint32_t _clusterBegin_lba;
+static uint32_t _firstFatSectorLba;
 ///////////////////////////////////////////////////////////////////
 
 // module-local functions /////////////////////////////////////////
 static uint32_t loadPrimaryPartition( void );
-static uint32_t loadFAT( void );
 static uint32_t loadFsRoot( void );
 static uint32_t loadDirectory( uint32_t cluster, DIR_ENTRY* dir );
 static void readDirectory( uint8_t* buffer, DIR_ENTRY* dir );
 static uint32_t locateDirEntry( const char* filePath, DIR_ENTRY* parent, DIR_ENTRY** entry );
+static file_id findFreeFileDescriptor( void );
+static uint32_t countChildren( uint8_t* buffer );
+static uint32_t calculateClusterLba( uint32_t clusterNumber );
+static uint32_t readCluster( uint32_t clusterLba, uint8_t* buffer );
 ///////////////////////////////////////////////////////////////////
 
 uint32_t
@@ -197,11 +225,6 @@ fat32Init( void )
 		return 1;
 	}
 
-	if ( loadFAT() )
-	{
-		return 1;
-	}
-
 	if ( loadFsRoot() )
 	{
 		return 1;
@@ -211,98 +234,166 @@ fat32Init( void )
 }
 
 uint32_t
-fat32Open( const char* filePath, FILE* file )
+fat32Open( const char* filePath, file_id* fileId )
 {
 	DIR_ENTRY* entry = 0;
+
+	file_id fId = findFreeFileDescriptor();
+	// no free file-descriptors found, error
+	if ( -1 == fId )
+	{
+		return 1;
+	}
 
 	if ( locateDirEntry( filePath, &_fsRoot, &entry ) )
 	{
 		return 1;
 	}
 
+	FILE_DESCRIPTOR* fd = &_fileDescriptors[ fId ];
 
+	fd->dirEntry = entry;
+	fd->currentCluster = entry->startClusterNumber;
 
-	return 0;
-}
+	fd->currentFatSectorBuffer = malloc( _fat32Bps.bytes_per_sector );
+	memset( fd->currentFatSectorBuffer, 0, _fat32Bps.bytes_per_sector );
 
-uint32_t
-fat32Close( FILE file )
-{
-	// TODO: implement
+	fd->currentClusterBuffer = malloc( _clusterBufferSize );
+	memset( fd->currentClusterBuffer, 0, _clusterBufferSize );
 
-	return 0;
-}
-
-uint32_t
-fat32Read( FILE file, uint32_t nBytes, uint8_t* buffer )
-{
-	// TODO: implement
+	*fileId = fId;
 
 	return 0;
 }
 
 uint32_t
-locateDirEntry( const char* filePath, DIR_ENTRY* parent, DIR_ENTRY** entry )
+fat32Close( file_id fileId )
 {
-	uint32_t i = 0;
-
-	char* isDirectory = strchr( filePath, '/' );
-	char* fileName = ( char* ) filePath;
-
-	if ( isDirectory )
+	// invalid file-id
+	if ( fileId > MAX_FILE_DESCRIPTORS || fileId < 0 )
 	{
-		fileName = strtok( fileName, "/" );
+		return 1;
 	}
 
-	for ( i = 0; i < parent->childrenCount; ++i )
+	FILE_DESCRIPTOR* fd = &_fileDescriptors[ fileId ];
+	// file is not opened, error
+	if ( 0 == fd->dirEntry )
 	{
-		DIR_ENTRY* child = &( ( DIR_ENTRY* ) parent->children )[ i ];
+		return 1;
+	}
 
-		// look for a matching file-name
-		if ( fileName == strstr( fileName, child->fileName ) )
+	free( fd->currentFatSectorBuffer );
+	free( fd->currentClusterBuffer );
+
+	memset( fd, 0, sizeof( FILE_DESCRIPTOR ) );
+
+	return 0;
+}
+
+int32_t
+fat32Read( file_id fileId, uint32_t nBytes, uint8_t* buffer )
+{
+	// invalid file-id, error
+	if ( fileId > MAX_FILE_DESCRIPTORS || fileId < 0 )
+	{
+		return -1;
+	}
+
+	FILE_DESCRIPTOR* fd = &_fileDescriptors[ fileId ];
+	// file is not opened, error
+	if ( 0 == fd->dirEntry )
+	{
+		return -1;
+	}
+
+	// alredy reached EOF in a previous read-operation, return 0 bytes read (no error)
+	if ( fd->fileCursor == fd->dirEntry->fileSize )
+	{
+		return 0;
+	}
+
+	uint32_t bytesRead = 0;
+
+	while ( 1 )
+	{
+		// cluster has not yet been read, do it now
+		if ( 0 == fd->clusterCursor )
 		{
-			// the entry is a directory, check if its part of the filename and traverse down
-			if ( DIRECTORY == child->type )
+			uint32_t clusterLba = calculateClusterLba( fd->currentCluster );
+			if ( readCluster( clusterLba, fd->currentClusterBuffer ) )
 			{
-				// its part of the filename, look recursively in the subdirectory
-				if ( isDirectory )
-				{
-					// directory not yet loaded, load it now
-					if ( -1 == child->childrenCount )
-					{
-						uint32_t cluster_lba = _clusterBegin_lba + ( child->clusterNumber - 2 ) * _fat32Bps.sectors_per_cluster;
+				return -1;
+			}
+		}
 
-						// loading failed
-						if ( loadDirectory( cluster_lba, child ) )
-						{
-							return 1;
-						}
-					}
+		// don't overshoot filesize
+		if ( fd->fileCursor + nBytes > fd->dirEntry->fileSize )
+		{
+			nBytes = fd->dirEntry->fileSize - fd->fileCursor;
+		}
 
-					// look recursively in subdirectory
-					return locateDirEntry( isDirectory + 1, child, entry );
-				}
-				// its the ending of the filename
-				else
+		uint32_t nBytesCopy = nBytes;
+
+		// reading more bytes than left in the current cluster
+		if ( fd->clusterCursor + nBytes > _clusterBufferSize )
+		{
+			nBytesCopy = _clusterBufferSize - fd->clusterCursor;
+		}
+
+		// copy the data between buffers
+		memcpy( &buffer[ bytesRead ], &fd->currentClusterBuffer[ fd->clusterCursor ], nBytesCopy );
+
+		bytesRead += nBytesCopy;
+		fd->clusterCursor += nBytesCopy;
+		fd->fileCursor += nBytesCopy;
+		nBytes -= nBytesCopy;
+
+		// reached end of file, stop
+		if ( fd->fileCursor == fd->dirEntry->fileSize )
+		{
+			break;
+		}
+
+		// reached end of cluster but not of file, setup for cluster-reload during next read
+		if ( fd->clusterCursor == _clusterBufferSize )
+		{
+			uint32_t fatOffset = fd->currentCluster * 4;
+			uint32_t fatSectorLba = _firstFatSectorLba + ( fatOffset / _fat32Bps.bytes_per_sector );
+			uint32_t entOffset = fatOffset % _fat32Bps.bytes_per_sector;
+
+			// check if cached fat-sector has changed and load it if it has
+			if ( fd->currentFatSectorLba != fatSectorLba )
+			{
+				// update cached fat-sector
+				fd->currentFatSectorLba = fatSectorLba;
+				// load the according sector of the FAT to access the next cluster or detect end of file
+				if ( readCluster( fd->currentFatSectorLba, fd->currentFatSectorBuffer ) )
 				{
-					// want to open a directory, is not allowed
 					return 1;
 				}
 			}
-			// the entry is a file, found it if its not part of the filname but its ending
-			else if ( ARCHIVE == child->type )
+
+			//remember to ignore the high 4 bits (FAT32 is infact FAT28 :D)
+			uint32_t tableValue = *( uint32_t* ) &fd->currentFatSectorBuffer[ entOffset ] & 0x0FFFFFFF;
+			// reached end of file
+			if ( tableValue >= 0x0FFFFFF8 )
 			{
-				if ( ! isDirectory )
-				{
-					// found
-					*entry = child;
-					return 0;
-				}
+				break;
 			}
+
+			// tableValue stores now the next cluster of this file
+			fd->currentCluster = tableValue;
+			// reset clustercursor to start, will do a cluster-read during the next
+			fd->clusterCursor = 0;
+		}
+		// not end of cluster yet, but read nBytes, leaving loop
+		else
+		{
+			break;
 		}
 	}
 
-	return 0;
+	return bytesRead;
 }
 
 uint32_t
@@ -361,27 +452,8 @@ loadPrimaryPartition( void )
 
 	// will always be a division without rest as bytes_per_sector is either 512, 1024, 2048 or 4096
 	_blocksPerSector = _fat32Bps.bytes_per_sector / SD_CARD_BLOCK_SIZE;
-
-	return 0;
-}
-
-uint32_t
-loadFAT( void )
-{
-	// TODO: maybe we don't need to read the complete FAT-table once, at it takes some time the larger the filesystem
-
-	uint32_t fatTableSize = _fat32Bps.table_size_32 * _fat32Bps.bytes_per_sector; // is sectors * bytes
-	uint32_t firstFatSector_lba = _primaryPartition.partitionStart_lba + _fat32Bps.reserved_sector_count;
-
-	// allocate memory to hold the complete fat-table
-	_fatTable = malloc( fatTableSize );
-	memset( _fatTable, 0, fatTableSize );
-
-	// read the complete fat-table in one step
-	if ( sdHalReadBlocks( firstFatSector_lba, _fat32Bps.table_size_32 * _blocksPerSector, _fatTable ) )
-	{
-		return 1;
-	}
+	_bytesPerCluster = _fat32Bps.sectors_per_cluster * _fat32Bps.bytes_per_sector;
+	_firstFatSectorLba = _primaryPartition.partitionStart_lba + _fat32Bps.reserved_sector_count;
 
 	return 0;
 }
@@ -405,10 +477,9 @@ loadFsRoot( void )
 }
 
 uint32_t
-loadDirectory( uint32_t cluster_lba, DIR_ENTRY* dir )
+loadDirectory( uint32_t clusterLba, DIR_ENTRY* dir )
 {
-	// read the complete first cluster
-	if ( sdHalReadBlocks( cluster_lba, _fat32Bps.sectors_per_cluster * _blocksPerSector, _clusterBuffer ) )
+	if ( readCluster( clusterLba, _clusterBuffer ) )
 	{
 		return 1;
 	}
@@ -423,46 +494,12 @@ readDirectory( uint8_t* buffer, DIR_ENTRY* dir )
 {
 	uint32_t i = 0;
 	uint32_t childIndex = 0;
-	uint32_t bytesPerCluster = _fat32Bps.sectors_per_cluster * _fat32Bps.bytes_per_sector;
 
-	for ( i = 0; i < bytesPerCluster; i += 32 )
-	{
-		// ignore unused files
-		if ( DIRECTORY_UNUSED == buffer[ i ] )
-		{
-			continue;
-		}
-		else if ( DIRECTORY_END == buffer[ i ] )
-		{
-			// reached end of directory, stop iterating through data
-			break;
-		}
-
-		FAT32_ENTRY* fat32Entry = ( FAT32_ENTRY* ) &buffer[ i ];
-
-		if ( DIR_ATTRIB_HIDDEN & fat32Entry->attributes || DIR_ATTRIB_SYSTEM & fat32Entry->attributes )
-		{
-			// ignore hidden or system files
-			continue;
-		}
-
-		if ( DIR_ATTRIB_VOLID & fat32Entry->attributes )
-		{
-			// NOTE: this is a hack to store the VolumeID in the root of the FS
-			memcpy( dir->fileName, fat32Entry->fileName, sizeof( fat32Entry->fileName ) );
-			dir->type = VOLUME;
-
-			// ignore volume-id
-			continue;
-		}
-
-		dir->childrenCount++;
-	}
-
+	dir->childrenCount = countChildren( buffer );
 	dir->children = malloc( dir->childrenCount * sizeof( DIR_ENTRY ) );
 	memset( dir->children, 0, dir->childrenCount * sizeof( DIR_ENTRY ) );
 
-	for ( i = 0; i < bytesPerCluster; i += 32 )
+	for ( i = 0; i < _bytesPerCluster; i += 32 )
 	{
 		// ignore unused files
 		if ( DIRECTORY_UNUSED == buffer[ i ] )
@@ -477,12 +514,16 @@ readDirectory( uint8_t* buffer, DIR_ENTRY* dir )
 
 		FAT32_ENTRY* fat32Entry = ( FAT32_ENTRY* ) &buffer[ i ];
 
-		if ( DIR_ATTRIB_HIDDEN & fat32Entry->attributes ||
-				 DIR_ATTRIB_SYSTEM & fat32Entry->attributes ||
-				 DIR_ATTRIB_VOLID & fat32Entry->attributes )
+		// long-name files have the first 4 bits set
+		if ( 0 == IS_LONGNAME( fat32Entry->attributes ) )
 		{
-			// ignore hidden/system/volume-id files
-			continue;
+			if ( IS_HIDDEN( fat32Entry->attributes ) ||
+					IS_SYSTEM( fat32Entry->attributes ) ||
+					IS_VOLUMEID( fat32Entry->attributes ) )
+			{
+				// ignore hidden / system / volumeid files
+				continue;
+			}
 		}
 
 		if ( DIR_ATTRIB_DIRECTORY & fat32Entry->attributes )
@@ -497,7 +538,7 @@ readDirectory( uint8_t* buffer, DIR_ENTRY* dir )
 		}
 
 		dir->children[ childIndex ].fileSize = fat32Entry->fileSize;
-		dir->children[ childIndex ].clusterNumber = ( fat32Entry->clusterNumberHigh << 0x10 ) | fat32Entry->clusterNumberLow;
+		dir->children[ childIndex ].startClusterNumber = ( fat32Entry->clusterNumberHigh << 0x10 ) | fat32Entry->clusterNumberLow;
 
 		uint8_t c = 0;
 		uint8_t cDir = 0;
@@ -525,4 +566,143 @@ readDirectory( uint8_t* buffer, DIR_ENTRY* dir )
 
 		++childIndex;
 	}
+
+	// TODO: a directory could span multiple clusters - handle it!
+}
+
+uint32_t
+locateDirEntry( const char* filePath, DIR_ENTRY* parent, DIR_ENTRY** entry )
+{
+	uint32_t i = 0;
+
+	char* isDirectory = strchr( filePath, '/' );
+	char* fileName = ( char* ) filePath;
+
+	if ( isDirectory )
+	{
+		fileName = strtok( fileName, "/" );
+	}
+
+	for ( i = 0; i < parent->childrenCount; ++i )
+	{
+		DIR_ENTRY* child = &( ( DIR_ENTRY* ) parent->children )[ i ];
+
+		// look for a matching file-name
+		if ( 0 == strcasecmp( fileName, child->fileName ) )
+		{
+			// the entry is a directory, check if its part of the filename and traverse down
+			if ( DIRECTORY == child->type )
+			{
+				// its part of the filename, look recursively in the subdirectory
+				if ( isDirectory )
+				{
+					// directory not yet loaded, load it now
+					if ( -1 == child->childrenCount )
+					{
+						uint32_t cluster_lba = calculateClusterLba( child->startClusterNumber );
+
+						// loading failed
+						if ( loadDirectory( cluster_lba, child ) )
+						{
+							return 1;
+						}
+					}
+
+					// look recursively in subdirectory
+					return locateDirEntry( isDirectory + 1, child, entry );
+				}
+				// its the ending of the filename
+				else
+				{
+					// want to open a directory, is not allowed
+					return 1;
+				}
+			}
+			// the entry is a file, found it if its not part of the filname but its ending
+			else if ( ARCHIVE == child->type )
+			{
+				if ( ! isDirectory )
+				{
+					// found
+					*entry = child;
+					return 0;
+				}
+			}
+		}
+	}
+
+	return 1;
+}
+
+uint32_t
+countChildren( uint8_t* buffer )
+{
+	uint32_t i = 0;
+	uint32_t counter = 0;
+
+	for ( i = 0; i < _bytesPerCluster; i += 32 )
+	{
+		// ignore unused files
+		if ( DIRECTORY_UNUSED == buffer[ i ] )
+		{
+			continue;
+		}
+		else if ( DIRECTORY_END == buffer[ i ] )
+		{
+			// reached end of directory, stop iterating through data
+			break;
+		}
+
+		FAT32_ENTRY* fat32Entry = ( FAT32_ENTRY* ) &buffer[ i ];
+
+		// long-name files have the first 4 bits set
+		if ( 0 == IS_LONGNAME( fat32Entry->attributes ) )
+		{
+			if ( IS_HIDDEN( fat32Entry->attributes ) ||
+					IS_SYSTEM( fat32Entry->attributes ) ||
+					IS_VOLUMEID( fat32Entry->attributes ) )
+			{
+				// ignore hidden / system / volumeid files
+				continue;
+			}
+		}
+
+		counter++;
+	}
+
+	return counter;
+}
+
+uint32_t
+readCluster( uint32_t clusterLba, uint8_t* buffer )
+{
+	if ( sdHalReadBlocks( clusterLba, _fat32Bps.sectors_per_cluster * _blocksPerSector, buffer ) )
+	{
+		return 1;
+	}
+
+	return 0;
+}
+
+file_id
+findFreeFileDescriptor( void )
+{
+	int32_t i = 0;
+
+	for ( i = 0; i < MAX_FILE_DESCRIPTORS; ++i )
+	{
+		// if dirEntry is 0, then this descriptor is not in use
+		if ( ! _fileDescriptors[ i ].dirEntry )
+		{
+			return i;
+		}
+	}
+
+	return -1;
+}
+
+uint32_t
+calculateClusterLba( uint32_t clusterNumber )
+{
+	return _clusterBegin_lba + ( clusterNumber - 2 ) * _fat32Bps.sectors_per_cluster;
 }

@@ -95,6 +95,9 @@ initOs( void )
 	return 0;
 }
 
+#include <stdlib.h>
+#include <string.h>
+
 /**
  * This function initializes all driver-servers
  * - keyboard driver
@@ -112,31 +115,68 @@ initDrivers( void )
 		return 1;
 	}
 
-	FILE boss = 0;
-	FILE bossTxt = 0;
-	FILE bossDirTxt = 0;
-	FILE bossSubTxt = 0;
-	FILE bossDir2 = 0;
-	uint32_t ret = 0;
+	file_id boss = 0;
+	file_id bossTxt = 0;
+	file_id bossDirTxt = 0;
+	file_id bossSubTxt = 0;
+	file_id mp3File01 = 0;
+	file_id mp3File08 = 0;
+	int32_t ret = 0;
 
-	uint8_t buffer[ 512 ];
+	uint8_t* buffer = ( uint8_t* ) malloc( 512 );
+	memset( buffer, 0, 512 );
+
+	// should fail, doesnt exist
+	ret = fat32Open( "BOSSTxt", &boss );
+	// should fail - cannot open a directory
+	ret = fat32Open( "BossDir2", &boss );
 
 	ret = fat32Open( "BOSS", &boss );
 	ret = fat32Open( "BOSS.txt", &bossTxt );
 	ret = fat32Open( "bossdir/bossdir.txt", &bossDirTxt );
 	ret = fat32Open( "bossdir/Bosssub/bosssub.txt", &bossSubTxt );
-	// should fail - cannot open a directory
-	ret = fat32Open( "BossDir2", &bossDir2 );
+	ret = fat32Open( "BigFiles/01.mp3", &mp3File01 );
+	ret = fat32Open( "BigFiles/08.mp3", &mp3File08 );
 
 	ret = fat32Read( boss, 512, buffer );
 	ret = fat32Read( bossTxt, 512, buffer );
 	ret = fat32Read( bossDirTxt, 512, buffer );
 	ret = fat32Read( bossSubTxt, 512, buffer );
 
+	uint64_t ms = getSysMillis();
+
+	while ( 1 )
+	{
+		ret = fat32Read( mp3File01, 510, buffer );
+		if ( 510 != ret )
+		{
+			break;
+		}
+	}
+
+	ms = getSysMillis( ) - ms;
+
+	ms = getSysMillis();
+
+	while ( 1 )
+	{
+		ret = fat32Read( mp3File08, 510, buffer );
+		if ( 510 != ret )
+		{
+			break;
+		}
+	}
+
+	ms = getSysMillis( ) - ms;
+
 	ret = fat32Close( boss );
 	ret = fat32Close( bossTxt );
 	ret = fat32Close( bossDirTxt );
 	ret = fat32Close( bossSubTxt );
+	ret = fat32Close( mp3File01 );
+	ret = fat32Close( mp3File08 );
+
+	free( buffer );
 
 	return 0;
 }

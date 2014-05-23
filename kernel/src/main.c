@@ -95,9 +95,6 @@ initOs( void )
 	return 0;
 }
 
-#include <stdlib.h>
-#include <string.h>
-
 /**
  * This function initializes all driver-servers
  * - keyboard driver
@@ -115,6 +112,11 @@ initDrivers( void )
 		return 1;
 	}
 
+	/* FAT32 testing and using code
+	#include <stdlib.h>
+	#include <string.h>
+	#define BUFFER_SIZE 1024
+
 	file_id boss = 0;
 	file_id bossTxt = 0;
 	file_id bossDirTxt = 0;
@@ -123,8 +125,8 @@ initDrivers( void )
 	file_id mp3File08 = 0;
 	int32_t ret = 0;
 
-	uint8_t* buffer = ( uint8_t* ) malloc( 512 );
-	memset( buffer, 0, 512 );
+	uint8_t* buffer = ( uint8_t* ) malloc( BUFFER_SIZE );
+	memset( buffer, 0, BUFFER_SIZE );
 
 	// should fail, doesnt exist
 	ret = fat32Open( "BOSSTxt", &boss );
@@ -138,17 +140,17 @@ initDrivers( void )
 	ret = fat32Open( "BigFiles/01.mp3", &mp3File01 );
 	ret = fat32Open( "BigFiles/08.mp3", &mp3File08 );
 
-	ret = fat32Read( boss, 512, buffer );
-	ret = fat32Read( bossTxt, 512, buffer );
-	ret = fat32Read( bossDirTxt, 512, buffer );
-	ret = fat32Read( bossSubTxt, 512, buffer );
+	ret = fat32Read( boss, BUFFER_SIZE, buffer );
+	ret = fat32Read( bossTxt, BUFFER_SIZE, buffer );
+	ret = fat32Read( bossDirTxt, BUFFER_SIZE, buffer );
+	ret = fat32Read( bossSubTxt, BUFFER_SIZE, buffer );
 
 	uint64_t ms = getSysMillis();
 
 	while ( 1 )
 	{
-		ret = fat32Read( mp3File01, 510, buffer );
-		if ( 510 != ret )
+		ret = fat32Read( mp3File01, BUFFER_SIZE, buffer );
+		if ( BUFFER_SIZE != ret )
 		{
 			break;
 		}
@@ -160,8 +162,8 @@ initDrivers( void )
 
 	while ( 1 )
 	{
-		ret = fat32Read( mp3File08, 510, buffer );
-		if ( 510 != ret )
+		ret = fat32Read( mp3File08, BUFFER_SIZE, buffer );
+		if ( BUFFER_SIZE != ret )
 		{
 			break;
 		}
@@ -177,6 +179,7 @@ initDrivers( void )
 	ret = fat32Close( mp3File08 );
 
 	free( buffer );
+	*/
 
 	return 0;
 }

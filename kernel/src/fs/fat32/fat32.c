@@ -340,7 +340,7 @@ fat32Read( file_id fileId, uint32_t nBytes, uint8_t* buffer )
 			nBytesCopy = _clusterBufferSize - fd->clusterCursor;
 		}
 
-		// copy the data between buffers
+		// copy the data between buffers - this is SLOW especially for big buffers
 		memcpy( &buffer[ bytesRead ], &fd->currentClusterBuffer[ fd->clusterCursor ], nBytesCopy );
 
 		bytesRead += nBytesCopy;

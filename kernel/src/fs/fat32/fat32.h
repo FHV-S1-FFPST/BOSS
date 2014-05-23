@@ -35,6 +35,12 @@ uint32_t fat32Close( file_id fileId );
 /**
  * Reads up to nBytes into buffer from file.
  * Returns the number of bytes actually read or -1 if failure or 0 if EOF has reached already during a previous read.
+ *
+ * HINT: read always less than 512 bytes as it is much faster.
+ * A test reading a 5MB MP3 file delivered:
+ * 133bytes: 8.3 sec
+ * 510bytes: 7.5 sec
+ * 512,1024,496 bytes: 13.9sec
  */
 int32_t fat32Read( file_id fileId, uint32_t nBytes, uint8_t* buffer );
 

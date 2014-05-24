@@ -83,13 +83,13 @@ void mmu_initPagetable(Pagetable* pt) {
 	switch(pt->type) {
 	case MASTER:
 		for(i = 0; i < 4096; i++) {
-			*PTE++ = 0xFFFFFFFF;
+			*PTE++ = 0x00000000;
 		}
 		break;
 	case COARSE:
 
 		for(i = 0; i < 256; i++) {
-			*PTE++ = 0xFFFFFFFF;
+			*PTE++ = 0x00000000;
 		}
 
 		break;

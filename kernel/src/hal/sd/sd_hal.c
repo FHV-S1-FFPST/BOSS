@@ -196,6 +196,8 @@ static uint32_t sendACmd51();
 #define MMCHS_IE_CERR_BIT 							0x10000000
 #define MMCHS_IE_BADA_BIT 							0x20000000
 
+#define MMCHS_ISE_CIRQ_SIGEN_BIT					0x100
+
 #define CMD8_CHECK_PATTERN  	0xAA
 #define CMD8_VOLT_2P7_3P6    	0x000100u
 #define SD_OCR_VDD_WILDCARD		(0x1FF << 15)
@@ -279,7 +281,8 @@ sdHalInit()
 
 	selectSupportedVoltage( MMCHS_CAPA_VS18_BIT | MMCHS_CAPA_VS30_BIT );
 
-	systemConfig( MMCHS_SYSCONFIG_AUTOIDLE_BIT );
+	// want enable wakeup when card is inserted
+	systemConfig( MMCHS_SYSCONFIG_AUTOIDLE_BIT /*| MMCHS_SYSCONFIG_ENAWAKEUP_BIT */ );
 
 	setBusWidth( BUS_WIDTH_1BIT );
 
@@ -297,6 +300,15 @@ sdHalInit()
 	{
 		return 1;
 	}
+
+	/*
+	// wake-up event enabled on card-insertion
+	MMCHS_HCTL |= MMCHS_HCTL_INS_BIT;
+	// clear all and set card-interrupt enable
+	MMCHS_ISE = MMCHS_ISE_CIRQ_SIGEN_BIT;
+
+	// TODO: the next only when card is inserted!
+	*/
 
 	sendInitStream();
 

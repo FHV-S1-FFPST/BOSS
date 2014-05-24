@@ -8,7 +8,7 @@
 #ifndef FAT32_H_
 #define FAT32_H_
 
-#include <inttypes.h>
+#include "../../common/common.h"
 
 typedef int32_t file_id;
 
@@ -43,5 +43,12 @@ uint32_t fat32Close( file_id fileId );
  * 512,1024,496 bytes: 13.9sec
  */
 int32_t fat32Read( file_id fileId, uint32_t nBytes, uint8_t* buffer );
+
+/**
+ * Stores the fileSize of the file with fileId in size.
+ * Returns 0 upon success.
+ * Returns 1 if not opened or invalid fileid.
+ */
+uint32_t fat32Size( file_id fileId, uint32_t* size );
 
 #endif /* FAT32_H_ */

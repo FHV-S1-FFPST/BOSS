@@ -8,12 +8,19 @@
 #include "fat32.h"
 
 #include "../../hal/sd/sd_hal.h"
-#include "../../common/common.h"
 
 #include <string.h>
 #include <strings.h>
 #include <stdlib.h>
 #include <ctype.h>
+
+/**
+ * Sources for implementation:
+ * Microsoft fat32 spec
+ * https://www.pjrc.com/tech/8051/ide/fat32.html
+ * http://wiki.osdev.org/FAT
+ * http://www.easeus.com/resource/fat32-disk-structure.htm
+ */
 
 // module defines //////////////////////////////////////////////
 #define MAX_FILE_DESCRIPTORS			16
@@ -203,6 +210,7 @@ static file_id findFreeFileDescriptor( void );
 static uint32_t countChildren( uint8_t* buffer );
 static uint32_t calculateClusterLba( uint32_t clusterNumber );
 static uint32_t readCluster( uint32_t clusterLba, uint8_t* buffer );
+static FILE_DESCRIPTOR* getOpenedFdById( file_id fileId );
 ///////////////////////////////////////////////////////////////////
 
 uint32_t
@@ -267,17 +275,24 @@ fat32Open( const char* filePath, file_id* fileId )
 }
 
 uint32_t
-fat32Close( file_id fileId )
+fat32Size( file_id fileId, uint32_t* size )
 {
-	// invalid file-id
-	if ( fileId > MAX_FILE_DESCRIPTORS || fileId < 0 )
+	FILE_DESCRIPTOR* fd = getOpenedFdById( fileId );
+	if ( 0 == fd )
 	{
 		return 1;
 	}
 
-	FILE_DESCRIPTOR* fd = &_fileDescriptors[ fileId ];
-	// file is not opened, error
-	if ( 0 == fd->dirEntry )
+	*size = fd->dirEntry->fileSize;
+
+	return 0;
+}
+
+uint32_t
+fat32Close( file_id fileId )
+{
+	FILE_DESCRIPTOR* fd = getOpenedFdById( fileId );
+	if ( 0 == fd )
 	{
 		return 1;
 	}
@@ -293,17 +308,10 @@ fat32Close( file_id fileId )
 int32_t
 fat32Read( file_id fileId, uint32_t nBytes, uint8_t* buffer )
 {
-	// invalid file-id, error
-	if ( fileId > MAX_FILE_DESCRIPTORS || fileId < 0 )
+	FILE_DESCRIPTOR* fd = getOpenedFdById( fileId );
+	if ( 0 == fd )
 	{
-		return -1;
-	}
-
-	FILE_DESCRIPTOR* fd = &_fileDescriptors[ fileId ];
-	// file is not opened, error
-	if ( 0 == fd->dirEntry )
-	{
-		return -1;
+		return 1;
 	}
 
 	// alredy reached EOF in a previous read-operation, return 0 bytes read (no error)
@@ -394,6 +402,27 @@ fat32Read( file_id fileId, uint32_t nBytes, uint8_t* buffer )
 	}
 
 	return bytesRead;
+}
+
+FILE_DESCRIPTOR*
+getOpenedFdById( file_id fileId )
+{
+	FILE_DESCRIPTOR* fd = 0;
+
+	// invalid file-id, error
+	if ( fileId > MAX_FILE_DESCRIPTORS || fileId < 0 )
+	{
+		return 0;
+	}
+
+	fd = &_fileDescriptors[ fileId ];
+	// file is not opened, error
+	if ( 0 == fd->dirEntry )
+	{
+		return 0;
+	}
+
+	return fd;
 }
 
 uint32_t

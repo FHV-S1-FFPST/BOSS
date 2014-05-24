@@ -5,6 +5,7 @@
 #include "mmu/mmu.h"
 
 #include "tasksimpl/task1.h"
+#include "task/taskLoader.h"
 
 /**
  * Prototypes
@@ -184,6 +185,8 @@ initDrivers( void )
 
 	free( buffer );
 	*/
+
+	loadTaskFromFile( "tasks/hello.out" );
 
 	return 0;
 }

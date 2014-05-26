@@ -13,6 +13,8 @@ _control_set:
 
 _ttb_set:
 	MCR p15, #0, r0, c2, c0, #0   ; TTB -> CP15:c2:c0
+	MCR p15, #0, r1, c13, c0, #1
+	MCR p15, #0, r0, c2, c0, #1
 	MOV PC, LR
 
 _tlb_flush:

@@ -7,9 +7,21 @@
 
 #include "mmu.h"
 
+extern void _ttb_set(unsigned int ttb, int asdf);
+extern void _tlb_flush(unsigned int c8format);
+extern void _pid_set(unsigned int pid);
+extern void _mmu_initPT(unsigned int PTE, unsigned int index, unsigned int * PTEptr);
+extern void _mmu_setDomainAccess(unsigned int value, unsigned int mask);
+extern void _control_set(unsigned int value, unsigned int mask);
+
 void mmu_initPagetable(Pagetable* pt);
 void mmu_mapRegion(Region* reg);
 void mmu_mapSectionTableRegion(Region* reg);
+
+void ttbSet(unsigned int ttb);
+void tlbFlush(void);
+void setProcessID(unsigned int pid);
+void domainAccessSet(uint32_t value, uint32_t mask);
 
 uint32_t mmu_init(void) {
 
@@ -20,6 +32,7 @@ uint32_t mmu_init(void) {
 	masterPT.ptAddress = 0x00100000;
 	masterPT.ptAddressPhysical = ptArea;
 	masterPT.type = MASTER;
+	masterPT.domain = 3;
 
 	Region osRegion;
 	osRegion.pageSize = 1024;
@@ -27,11 +40,51 @@ uint32_t mmu_init(void) {
 	osRegion.vAddress = 0x00600000;
 	osRegion.physicalStartAdress = 0x80500000;
 	osRegion.AP = ReadWriteNoAccess;
-	osRegion.CB = WriteThrough;
+	osRegion.CB = WriteBack;
 	osRegion.ptType = MASTER;
 
+	Region peripheralRegion;
+	peripheralRegion.pageSize = 1024;
+	peripheralRegion.numPages = 896;
+	peripheralRegion.vAddress = 0x48000000;
+	peripheralRegion.physicalStartAdress = 0x48000000;
+	peripheralRegion.AP = ReadWriteNoAccess;
+	peripheralRegion.CB = NotCachedNotBuffered;
+	peripheralRegion.ptType = MASTER;
+
+	Region pageTableRegion;
+	pageTableRegion.pageSize = 1024;
+	pageTableRegion.numPages = 5;
+	pageTableRegion.vAddress = 0x00100000;
+	pageTableRegion.physicalStartAdress = 0x80000000;
+	pageTableRegion.AP = ReadWriteNoAccess;
+	pageTableRegion.CB = WriteBack;
+	pageTableRegion.ptType = MASTER;
+
+	Region sramRegion;
+	sramRegion.pageSize = 1024;
+	sramRegion.numPages = 1;
+	sramRegion.vAddress = 0x40200000;
+	sramRegion.physicalStartAdress = 0x40200000;
+	sramRegion.AP = ReadWriteNoAccess;
+	sramRegion.CB = WriteBack;
+	sramRegion.ptType = MASTER;
+
 	mmu_initPagetable(&masterPT);
+
 	mmu_mapRegion(&osRegion);
+	mmu_mapRegion(&peripheralRegion);
+	mmu_mapRegion(&pageTableRegion);
+	mmu_mapRegion(&sramRegion);
+
+	_ttb_set((uint32_t) 0x00100000, 0);
+
+	domainAccessSet(DOM3CLT, CHANGEALLDOM);
+
+	uint32_t enable = ENABLEMMU | ENABLEICACHE | ENABLEDCACHE;
+	uint32_t change = CHANGEMMU | CHANGEICACHE | CHANGEDCACHE;
+
+	_control_set(enable, change);
 
 	return 0;
 }
@@ -98,4 +151,22 @@ void mmu_initPagetable(Pagetable* pt) {
 	}
 }
 
+void domainAccessSet(uint32_t value, uint32_t mask) {
+	_mmu_setDomainAccess(value, mask);
+}
+
+void ttbSet(unsigned int ttb) {
+	ttb &= 0xffffc000;
+	_ttb_set(ttb, 0);
+}
+
+void tlbFlush(void) {
+	unsigned int c8format = 0;
+	_tlb_flush(c8format);
+}
+
+void setProcessID(unsigned int pid) {
+	pid = pid << 25;
+	_pid_set(pid);
+}
 

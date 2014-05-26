@@ -13,42 +13,40 @@
 #include <string.h>
 
 typedef enum {
-	FAULT,
-	MASTER,
-	COARSE
+	FAULT = 0,
+	MASTER = 1,
+	COARSE = 2
 } PageTableType;
 
 typedef enum {
 	NoAccessTwiceBitch = 0,
-	ReadWriteNoAccess,
-	ReadWriteReadOnly,
-	ReadWriteTwiceBitch
+	ReadWriteNoAccess = 1,
+	ReadWriteReadOnly = 2,
+	ReadWriteTwiceBitch = 3
 } AccessProtectionType;
 
 typedef enum {
 	NotCachedNotBuffered = 0,
-	NotCachedBuffered,
-	WriteThrough,
-	WriteBack
+	NotCachedBuffered = 1,
+	WriteThrough = 2,
+	WriteBack = 3
 } CacheType;
 
-/* First 2 chars for privileged mode, second 2 chars for user mode */
-/* NA = no access, RO = read only, RW = read and write */
-#define NANA 0x00
-#define RWNA 0x01
-#define RWRO 0x02
-#define RWRW 0x03
+#define DOM3CLT 0x00000040
+#define CHANGEALLDOM 0xFFFFFFFF
 
-#define NCNB 0x00	// not cached, not buffered
-#define NCB 0x01	// not cached, buffered
-#define WT 0x02		// write through cached
-#define WB 0x03		// write back cached
+#define ENABLEMMU 0x0001
+#define ENABLEDCACHE 0x0004
+#define ENABLEICACHE 0x1000
+#define CHANGEMMU 0x0001
+#define CHANGEDCACHE 0x0004
+#define CHANGEICACHE 0x1000
 
 typedef struct {
 	uint32_t vAddress;				// virtuelle Startadresse des Bereiches den diese Pagetable übernimmt
 	uint32_t ptAddress;				// virtuelle Adresse der Pagetable
 	uint32_t ptAddressPhysical;		// physische Adresse der Pagetable
-	PageTableType type;					// pagetable type
+	PageTableType type;				// pagetable type
 	uint8_t domain;
 } Pagetable;
 

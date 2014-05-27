@@ -1,0 +1,162 @@
+******************************************************************************
+                  TI ARM Linker PC v5.1.1                      
+******************************************************************************
+>> Linked Tue May 27 16:47:55 2014
+
+OUTPUT FILE NAME:   <SleepAndFork.out>
+ENTRY POINT SYMBOL: "_c_int00"  address: 805024b0
+
+
+MEMORY CONFIGURATION
+
+         name            origin    length      used     unused   attr    fill
+----------------------  --------  ---------  --------  --------  ----  --------
+  int_ram               40200000   0000ffff  00000000  0000ffff  RWIX
+  ext_ddr_os            80500000   02000000  00002590  01ffda70  RWIX
+  ext_ddr_rest          82500000   3db00000  00000000  3db00000  RWIX
+
+
+SEGMENT ALLOCATION MAP
+
+run origin  load origin   length   init length attrs members
+----------  ----------- ---------- ----------- ----- -------
+80500000    80500000    00002000   00000000    rw-
+  80500000    80500000    00002000   00000000    rw- .stack
+80502000    80502000    00000558   00000558    r-x
+  80502000    80502000    00000558   00000558    r-x .text
+80502558    80502558    00000014   00000000    rw-
+  80502558    80502558    00000014   00000000    rw- .data
+80502570    80502570    00000024   00000024    r--
+  80502570    80502570    00000024   00000024    r-- .cinit
+
+
+SECTION ALLOCATION MAP
+
+ output                                  attributes/
+section   page    origin      length       input sections
+--------  ----  ----------  ----------   ----------------
+.stack     0    80500000    00002000     UNINITIALIZED
+                  80500000    00002000     --HOLE--
+
+.text      0    80502000    00000558     
+                  80502000    00000180     rtsv7A8_A_le_eabi.lib : memcpy32.obj (.text)
+                  80502180    000000d4                           : auto_init.obj (.text)
+                  80502254    000000cc     main.obj (.text)
+                  80502320    00000098     rtsv7A8_A_le_eabi.lib : copy_decompress_rle.obj (.text)
+                  805023b8    00000080                           : cpy_tbl.obj (.text)
+                  80502438    00000078                           : exit.obj (.text)
+                  805024b0    00000048                           : boot.obj (.text)
+                  805024f8    00000024                           : _lock.obj (.text)
+                  8050251c    00000020                           : args_main.obj (.text)
+                  8050253c    00000014                           : copy_decompress_none.obj (.text:decompress:none)
+                  80502550    00000008                           : copy_decompress_rle.obj (.text:decompress:rle24)
+
+.data      0    80502558    00000014     UNINITIALIZED
+                  80502558    00000008     rtsv7A8_A_le_eabi.lib : _lock.obj (.data)
+                  80502560    00000008                           : exit.obj (.data)
+                  80502568    00000004                           : stkdepth_vars.obj (.data)
+
+.cinit     0    80502570    00000024     
+                  80502570    00000011     (.cinit..data.load) [load image, compression = rle]
+                  80502581    00000003     --HOLE-- [fill = 0]
+                  80502584    00000008     (__TI_handler_table)
+                  8050258c    00000008     (__TI_cinit_table)
+
+
+LINKER GENERATED COPY TABLES
+
+__TI_cinit_table @ 8050258c records: 1, size/record: 8, table size: 8
+	.data: load addr=80502570, load size=00000011 bytes, run addr=80502558, run size=00000014 bytes, compression=rle
+
+
+LINKER GENERATED HANDLER TABLE
+
+__TI_handler_table @ 80502584 records: 2, size/record: 4, table size: 8
+	index: 0, handler: __TI_decompress_rle24
+	index: 1, handler: __TI_decompress_none
+
+
+GLOBAL SYMBOLS: SORTED ALPHABETICALLY BY Name 
+
+address    name
+--------   ----
+80502438   C$$EXIT
+UNDEFED    SHT$$INIT_ARRAY$$Base
+UNDEFED    SHT$$INIT_ARRAY$$Limit
+80502000   __STACK_END
+00002000   __STACK_SIZE
+8050258c   __TI_CINIT_Base
+80502594   __TI_CINIT_Limit
+80502584   __TI_Handler_Table_Base
+8050258c   __TI_Handler_Table_Limit
+00000001   __TI_args_main
+80502180   __TI_auto_init
+80502560   __TI_cleanup_ptr
+8050253c   __TI_decompress_none
+80502550   __TI_decompress_rle24
+80502564   __TI_dtors_ptr
+80502570   __TI_static_base__
+80502000   __aeabi_memcpy
+80502000   __aeabi_memcpy4
+80502000   __aeabi_memcpy8
+ffffffff   __binit__
+ffffffff   __c_args__
+80500000   __stack
+8050251c   _args_main
+805024b0   _c_int00
+80502558   _lock
+80502510   _nop
+80502504   _register_lock
+805024f8   _register_unlock
+8050255c   _unlock
+80502440   abort
+ffffffff   binit
+805023b8   copy_in
+8050244c   exit
+80502254   main
+80502568   main_func_sp
+80502000   memcpy
+
+
+GLOBAL SYMBOLS: SORTED BY Symbol Address 
+
+address    name
+--------   ----
+00000001   __TI_args_main
+00002000   __STACK_SIZE
+80500000   __stack
+80502000   __STACK_END
+80502000   __aeabi_memcpy
+80502000   __aeabi_memcpy4
+80502000   __aeabi_memcpy8
+80502000   memcpy
+80502180   __TI_auto_init
+80502254   main
+805023b8   copy_in
+80502438   C$$EXIT
+80502440   abort
+8050244c   exit
+805024b0   _c_int00
+805024f8   _register_unlock
+80502504   _register_lock
+80502510   _nop
+8050251c   _args_main
+8050253c   __TI_decompress_none
+80502550   __TI_decompress_rle24
+80502558   _lock
+8050255c   _unlock
+80502560   __TI_cleanup_ptr
+80502564   __TI_dtors_ptr
+80502568   main_func_sp
+80502570   __TI_static_base__
+80502584   __TI_Handler_Table_Base
+8050258c   __TI_CINIT_Base
+8050258c   __TI_Handler_Table_Limit
+80502594   __TI_CINIT_Limit
+ffffffff   __binit__
+ffffffff   __c_args__
+ffffffff   binit
+UNDEFED    SHT$$INIT_ARRAY$$Base
+UNDEFED    SHT$$INIT_ARRAY$$Limit
+
+[36 symbols]

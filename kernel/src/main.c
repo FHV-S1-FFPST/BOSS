@@ -105,9 +105,13 @@ initDrivers( void )
 		return 1;
 	}
 
+	/*
 	loadTaskFromFile( "boot/hdmidrv.out" );
 	loadTaskFromFile( "boot/rs232drv.out" );
 	loadTaskFromFile( "boot/console.out" );
+	*/
+
+	loadTaskFromFile( "user/saf.out");
 
 	return 0;
 }

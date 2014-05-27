@@ -98,6 +98,7 @@ int32_t fork();
 
 /**
  * Suspends the task for at least the given milliseconds.
+ * TODO: replace by a receive on the null-channel with a given timeout of millis
  */
 int32_t sleep( uint32_t millis );
 

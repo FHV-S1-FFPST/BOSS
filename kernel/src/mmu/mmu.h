@@ -32,7 +32,7 @@ typedef enum {
 	WriteBack = 3
 } CacheType;
 
-#define DOM3CLT 0x00000040
+#define DOM3CLT 0xC0
 #define CHANGEALLDOM 0xFFFFFFFF
 
 #define ENABLEMMU 0x0001

@@ -7,12 +7,19 @@
 
 #include "mmu.h"
 
-extern void _ttb_set(unsigned int ttb, int asdf);
+extern void _ttb_set(unsigned int ttb);
 extern void _tlb_flush(unsigned int c8format);
 extern void _pid_set(unsigned int pid);
 extern void _mmu_initPT(unsigned int PTE, unsigned int index, unsigned int * PTEptr);
 extern void _mmu_setDomainAccess(unsigned int value, unsigned int mask);
 extern void _control_set(unsigned int value, unsigned int mask);
+extern void _ttbr_set_ctrl_bits(unsigned int bits);
+extern void _ttbr_enable_write_buffer();
+extern void test();
+extern void _mmu_activate();
+
+#define MASTER_PT 0x80000000
+
 
 void mmu_initPagetable(Pagetable* pt);
 void mmu_mapRegion(Region* reg);
@@ -29,7 +36,7 @@ uint32_t mmu_init(void) {
 
 	Pagetable masterPT;
 	masterPT.vAddress = 0x00000000;
-	masterPT.ptAddress = 0x00100000;
+	masterPT.ptAddress = MASTER_PT;
 	masterPT.ptAddressPhysical = ptArea;
 	masterPT.type = MASTER;
 	masterPT.domain = 3;
@@ -37,7 +44,7 @@ uint32_t mmu_init(void) {
 	Region osRegion;
 	osRegion.pageSize = 1024;
 	osRegion.numPages = 32;
-	osRegion.vAddress = 0x00600000;
+	osRegion.vAddress = 0x80500000;
 	osRegion.physicalStartAdress = 0x80500000;
 	osRegion.AP = ReadWriteNoAccess;
 	osRegion.CB = WriteBack;
@@ -55,7 +62,7 @@ uint32_t mmu_init(void) {
 	Region pageTableRegion;
 	pageTableRegion.pageSize = 1024;
 	pageTableRegion.numPages = 5;
-	pageTableRegion.vAddress = 0x00100000;
+	pageTableRegion.vAddress = MASTER_PT;
 	pageTableRegion.physicalStartAdress = 0x80000000;
 	pageTableRegion.AP = ReadWriteNoAccess;
 	pageTableRegion.CB = WriteBack;
@@ -77,14 +84,24 @@ uint32_t mmu_init(void) {
 	mmu_mapRegion(&pageTableRegion);
 	mmu_mapRegion(&sramRegion);
 
-	_ttb_set((uint32_t) 0x00100000, 0);
+	/*_ttbr_set_ctrl_bits(0x0); //First 3 bits != null OS/HW call else VM
+	_ttbr_enable_write_buffer();
+
+	_ttb_set((uint32_t) 0x80000000, 0);
 
 	domainAccessSet(DOM3CLT, CHANGEALLDOM);
 
-	uint32_t enable = ENABLEMMU | ENABLEICACHE | ENABLEDCACHE;
-	uint32_t change = CHANGEMMU | CHANGEICACHE | CHANGEDCACHE;
+	uint32_t enable = ENABLEMMU | 0x08;
+	uint32_t change = CHANGEMMU | 0x08;
 
-	_control_set(enable, change);
+	_control_set(enable, change);*/
+
+	_ttb_set(MASTER_PT);
+	test();
+	_mmu_activate();
+
+	uint32_t *testP = (uint32_t *)0x00100000;
+	*testP = 5;
 
 	return 0;
 }
@@ -106,18 +123,18 @@ void mmu_mapRegion(Region* reg) {
 
 void mmu_mapSectionTableRegion(Region* reg) {
 	uint32_t* master = (uint32_t *) 0x80000000;		// get master page table
-	uint32_t tempVAdress = reg->vAddress;				// get start adress of region
+	uint32_t tempVAdress = reg->vAddress;				// get start address of region
 	uint32_t tempPAdress = reg->physicalStartAdress;
 	uint32_t PTE = 0;
 
 	uint32_t i;
 
 	for(i = 0; i < reg->numPages; i++) {					// iterate through all pages
-		uint32_t index = (tempVAdress >> 20) & 0x00000FFF;	// get base of virtual adress [20:31]
+		uint32_t index = (tempVAdress >> 20) & 0x00000FFF;	// get base of virtual address [20:31]
 
 		PTE = (tempPAdress & 0xFFF00000);
 		PTE |= ( reg->AP << 10 );
-		PTE |= ( 0x0 << 5);								// TODO: domain
+		PTE |= ( 0x03 << 5);								// TODO: domain
 		PTE |= ( reg->CB << 2);
 		PTE |= 0x2;
 
@@ -157,7 +174,7 @@ void domainAccessSet(uint32_t value, uint32_t mask) {
 
 void ttbSet(unsigned int ttb) {
 	ttb &= 0xffffc000;
-	_ttb_set(ttb, 0);
+	_ttb_set(ttb);
 }
 
 void tlbFlush(void) {

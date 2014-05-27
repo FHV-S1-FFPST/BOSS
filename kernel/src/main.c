@@ -58,9 +58,9 @@ main( void )
 int32_t
 initHardware( void )
 {
-	/*if(mmu_init()) {
+	if(mmu_init()) {
 		return 1;
-	} */
+	}
 
 	return 0;
 }

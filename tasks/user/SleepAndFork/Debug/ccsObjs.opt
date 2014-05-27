@@ -1,1 +1,0 @@
-"./src/main.obj" "../boss_task_linker_script.cmd" -l"libc.a" 

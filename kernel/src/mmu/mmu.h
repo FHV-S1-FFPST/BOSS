@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <inttypes.h>
 #include <string.h>
+#include "../page_manager/pageManager.h"
 
 typedef enum {
 	FAULT = 0,
@@ -31,6 +32,11 @@ typedef enum {
 	WriteThrough = 2,
 	WriteBack = 3
 } CacheType;
+
+typedef enum {
+	Fixed = 0,
+	Dynamic = 1
+} MappingType;
 
 #define DOM3CLT 0xC0
 #define CHANGEALLDOM 0xFFFFFFFF
@@ -53,11 +59,12 @@ typedef struct {
 typedef struct {
 	uint32_t vAddress;				// virtuelle Startadresse der Region
 	uint32_t physicalStartAdress;	// physische Startadresse der Region
+	uint32_t numPages;				// anzahl der pages in region
 	uint16_t pageSize;				// page size
-	uint16_t numPages;				// anzahl der pages in region
 	AccessProtectionType AP;		// access permission
 	CacheType CB;					// cache and write buffer attributes
 	PageTableType ptType;
+	MappingType mappingType;
 } Region;
 
 uint32_t mmu_init(void);

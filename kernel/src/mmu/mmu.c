@@ -7,37 +7,35 @@
 
 #include "mmu.h"
 
+#define MASTER_PT 0x80000000
+
 extern void _ttb_set(unsigned int ttb);
 extern void _tlb_flush(unsigned int c8format);
 extern void _pid_set(unsigned int pid);
-extern void _mmu_initPT(unsigned int PTE, unsigned int index, unsigned int * PTEptr);
 extern void _mmu_setDomainAccess(unsigned int value, unsigned int mask);
-extern void _control_set(unsigned int value, unsigned int mask);
-extern void _ttbr_set_ctrl_bits(unsigned int bits);
-extern void _ttbr_enable_write_buffer();
-extern void test();
+extern void _mmu_init();
 extern void _mmu_activate();
-
-#define MASTER_PT 0x80000000
-
 
 void mmu_initPagetable(Pagetable* pt);
 void mmu_mapRegion(Region* reg);
 void mmu_mapSectionTableRegion(Region* reg);
+void mmu_mapCoarseTableRegion(Region* reg);
 
 void ttbSet(unsigned int ttb);
 void tlbFlush(void);
 void setProcessID(unsigned int pid);
 void domainAccessSet(uint32_t value, uint32_t mask);
 
+uint32_t *nextFreePT;
+
 uint32_t mmu_init(void) {
 
-	uint32_t ptArea = 0x80000000;
+	nextFreePT = (uint32_t *) 0x80004000;
 
 	Pagetable masterPT;
 	masterPT.vAddress = 0x00000000;
 	masterPT.ptAddress = MASTER_PT;
-	masterPT.ptAddressPhysical = ptArea;
+	masterPT.ptAddressPhysical = MASTER_PT;
 	masterPT.type = MASTER;
 	masterPT.domain = 3;
 
@@ -49,6 +47,7 @@ uint32_t mmu_init(void) {
 	osRegion.AP = ReadWriteNoAccess;
 	osRegion.CB = WriteBack;
 	osRegion.ptType = MASTER;
+	osRegion.mappingType = Fixed;
 
 	Region peripheralRegion;
 	peripheralRegion.pageSize = 1024;
@@ -58,6 +57,7 @@ uint32_t mmu_init(void) {
 	peripheralRegion.AP = ReadWriteNoAccess;
 	peripheralRegion.CB = NotCachedNotBuffered;
 	peripheralRegion.ptType = MASTER;
+	peripheralRegion.mappingType = Fixed;
 
 	Region pageTableRegion;
 	pageTableRegion.pageSize = 1024;
@@ -67,15 +67,17 @@ uint32_t mmu_init(void) {
 	pageTableRegion.AP = ReadWriteNoAccess;
 	pageTableRegion.CB = WriteBack;
 	pageTableRegion.ptType = MASTER;
+	pageTableRegion.mappingType = Fixed;
 
 	Region sramRegion;
-	sramRegion.pageSize = 1024;
-	sramRegion.numPages = 1;
+	sramRegion.pageSize = 4;
+	sramRegion.numPages = 16;
 	sramRegion.vAddress = 0x40200000;
 	sramRegion.physicalStartAdress = 0x40200000;
 	sramRegion.AP = ReadWriteNoAccess;
 	sramRegion.CB = WriteBack;
-	sramRegion.ptType = MASTER;
+	sramRegion.ptType = COARSE;
+	sramRegion.mappingType = Fixed;
 
 	mmu_initPagetable(&masterPT);
 
@@ -84,24 +86,9 @@ uint32_t mmu_init(void) {
 	mmu_mapRegion(&pageTableRegion);
 	mmu_mapRegion(&sramRegion);
 
-	/*_ttbr_set_ctrl_bits(0x0); //First 3 bits != null OS/HW call else VM
-	_ttbr_enable_write_buffer();
-
-	_ttb_set((uint32_t) 0x80000000, 0);
-
-	domainAccessSet(DOM3CLT, CHANGEALLDOM);
-
-	uint32_t enable = ENABLEMMU | 0x08;
-	uint32_t change = CHANGEMMU | 0x08;
-
-	_control_set(enable, change);*/
-
 	_ttb_set(MASTER_PT);
-	test();
+	_mmu_init();
 	_mmu_activate();
-
-	uint32_t *testP = (uint32_t *)0x00100000;
-	*testP = 5;
 
 	return 0;
 }
@@ -114,6 +101,7 @@ void mmu_mapRegion(Region* reg) {
 		mmu_mapSectionTableRegion(reg);
 		break;
 	case COARSE:
+		mmu_mapCoarseTableRegion(reg);
 		break;
 	default:
 		break;
@@ -121,8 +109,76 @@ void mmu_mapRegion(Region* reg) {
 
 }
 
+void mmu_mapCoarseTableRegion(Region* reg) {
+
+	uint32_t *masterPT = (uint32_t *) 0x80000000;
+	uint32_t numPageTables = (reg->numPages / 256) + 1;
+	uint32_t i, j;
+
+	uint32_t regVAdressTemp = reg->vAddress;
+	uint32_t regPAdressTemp = reg->physicalStartAdress;
+
+	uint32_t PTE = 0;
+	uint32_t pagesToWrite = 0;
+
+
+	for(i = 0; i < numPageTables; i++) {
+		Pagetable tempTable;
+		tempTable.ptAddress = (uint32_t) nextFreePT;
+		tempTable.ptAddressPhysical = tempTable.ptAddress;
+		tempTable.type = COARSE;
+		tempTable.domain = 3;
+
+		mmu_initPagetable(&tempTable);
+
+		// write entry in l1 table that points to l2 table
+		uint32_t indexInL1 = (regVAdressTemp >> 20) & 0x00000FFF;
+
+		PTE = 0;
+		PTE = (tempTable.ptAddress & 0xFFFFFC00);
+		PTE |= tempTable.domain << 5;
+		PTE |= 0x1;
+
+		masterPT[indexInL1] = PTE;
+		nextFreePT += 0x400;
+
+		if(numPageTables == i + 1) {
+			pagesToWrite = reg->numPages % 256;
+		} else {
+			pagesToWrite = 256;
+		}
+
+		// TODO: write l2 table
+		for(j = 0; j < pagesToWrite; j++) {
+			PTE = 0;
+
+			if(reg->mappingType == Fixed) {
+				PTE = regPAdressTemp & 0xFFFFF000;
+				regPAdressTemp += 0x1000;
+			} else {
+				PTE = getFreePage(0) & 0xFFFFF000;
+			}
+
+			PTE |= reg->AP << 10;
+			PTE |= reg->AP << 8;
+			PTE |= reg->AP << 6;
+			PTE |= reg->AP << 4;
+			PTE |= reg->CB << 2;
+			PTE |= 0x2;
+
+			((uint32_t *)tempTable.ptAddress)[j] = PTE;
+
+		}
+
+		regVAdressTemp += 0x100000;
+
+	}
+
+
+}
+
 void mmu_mapSectionTableRegion(Region* reg) {
-	uint32_t* master = (uint32_t *) 0x80000000;		// get master page table
+	uint32_t* master = ( uint32_t *) 0x80000000;		// get master page table
 	uint32_t tempVAdress = reg->vAddress;				// get start address of region
 	uint32_t tempPAdress = reg->physicalStartAdress;
 	uint32_t PTE = 0;
@@ -132,13 +188,14 @@ void mmu_mapSectionTableRegion(Region* reg) {
 	for(i = 0; i < reg->numPages; i++) {					// iterate through all pages
 		uint32_t index = (tempVAdress >> 20) & 0x00000FFF;	// get base of virtual address [20:31]
 
+		PTE = 0;
 		PTE = (tempPAdress & 0xFFF00000);
 		PTE |= ( reg->AP << 10 );
 		PTE |= ( 0x03 << 5);								// TODO: domain
 		PTE |= ( reg->CB << 2);
 		PTE |= 0x2;
 
-		*(master + index) = PTE;
+		master[ index ] = PTE;
 		tempVAdress += 0x100000;						// increase address to next index of virtual memory (1 MB)
 		tempPAdress += 0x100000;						// increase address to next index of physical memory (1 MB)
 	}

@@ -16,6 +16,16 @@
 #define EI_CLASS_32_BIT			0x1
 #define E_TYPE_EXECUTABLE		0x2
 #define E_MACHINE_ARM			0x28
+
+#define PT_LOAD 				1
+
+#define PF_X 					0x1
+#define PF_W 					0x2
+#define PF_R 					0x4
+
+#define PF_TEXT_SEGMENT 		PF_X | PF_R
+#define PF_DATA_SEGMENT 		PF_X | PF_W | PF_R
+
 ///////////////////////////////////////////////////////////////
 
 // module-local structures
@@ -46,6 +56,18 @@ typedef struct
 	uint16_t e_shnum;
 	uint16_t e_shstrndx;
 } ELF_HEADER;
+
+typedef struct
+{
+	uint32_t p_type;
+	uint32_t p_offset;
+	uint32_t p_vaddr;
+	uint32_t p_paddr;
+	uint32_t p_filesz;
+	uint32_t p_memsz;
+	uint32_t p_flags;
+	uint32_t p_align;
+} PROGRAM_HEADER;
 ///////////////////////////////////////////////////////////////
 
 // module-local data
@@ -55,6 +77,7 @@ static uint8_t eIdentMagicNumber[ 4 ] = { 0x7F, 'E', 'L', 'F' };
 uint32_t
 loadTaskFromFile( const char* fileName )
 {
+	uint32_t i = 0;
 	uint32_t fileSize = 0;
 	uint8_t* fileBuffer = 0;
 	file_id taskImageFile = 0;
@@ -118,6 +141,29 @@ loadTaskFromFile( const char* fileName )
 	{
 		ret = 1;
 		goto closeAndExit;
+	}
+
+	for ( i = 0; i < elfHeader->e_phnum; ++i )
+	{
+		PROGRAM_HEADER* programHeader = ( PROGRAM_HEADER* ) &fileBuffer[ elfHeader->e_phoff + ( i * elfHeader->e_phentsize ) ];
+
+		if ( PT_LOAD != programHeader->p_type )
+		{
+			continue;
+		}
+
+		if ( PF_TEXT_SEGMENT == programHeader->p_flags )
+		{
+			programHeader->p_type = 0;
+		}
+		else if ( PF_DATA_SEGMENT == programHeader->p_flags )
+		{
+			programHeader->p_type = 0;
+		}
+		else
+		{
+			// ignore
+		}
 	}
 
 	ret = 0;

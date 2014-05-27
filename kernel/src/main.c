@@ -4,6 +4,7 @@
 #include "fs/fat32/fat32.h"
 #include "mmu/mmu.h"
 #include "task/taskLoader.h"
+#include "page_manager/pageManager.h"
 
 /**
  * Prototypes
@@ -50,13 +51,17 @@ main( void )
 
 /**
  * This function initializes the hardware of the beagleboard
- * - power management functionality
- * - interrupts
  */
 int32_t
 initHardware( void )
 {
-	if(mmu_init()) {
+	if ( initPageManager( ) )
+	{
+		return 1;
+	}
+
+	if( mmu_init() )
+	{
 		return 1;
 	}
 
@@ -106,12 +111,12 @@ initDrivers( void )
 	}
 
 	/*
-	loadTaskFromFile( "boot/hdmidrv.out" );
-	loadTaskFromFile( "boot/rs232drv.out" );
-	loadTaskFromFile( "boot/console.out" );
+	loadTaskFromFile( "sys/hdmidrv.out" );
+	loadTaskFromFile( "sys/rs232drv.out" );
+	loadTaskFromFile( "sys/console.out" );
 	*/
 
-	loadTaskFromFile( "user/saf.out");
+	loadTaskFromFile( "usr/saf.out");
 
 	return 0;
 }

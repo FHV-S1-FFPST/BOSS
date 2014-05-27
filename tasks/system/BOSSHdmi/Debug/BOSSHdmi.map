@@ -1,0 +1,272 @@
+******************************************************************************
+                  TI ARM Linker PC v5.1.1                      
+******************************************************************************
+>> Linked Tue May 27 16:22:07 2014
+
+OUTPUT FILE NAME:   <BOSSHdmi.out>
+ENTRY POINT SYMBOL: "_c_int00"  address: 81403370
+
+
+MEMORY CONFIGURATION
+
+         name            origin    length      used     unused   attr    fill
+----------------------  --------  ---------  --------  --------  ----  --------
+  int_ram               40200000   0000ffff  00000000  0000ffff  RWIX
+  ext_ddr_os            80500000   02000000  00f03fdd  010fc023  RWIX
+  ext_ddr_rest          82500000   3db00000  00000000  3db00000  RWIX
+
+
+SEGMENT ALLOCATION MAP
+
+run origin  load origin   length   init length attrs members
+----------  ----------- ---------- ----------- ----- -------
+80500000    80500000    00f02000   00000000    rw-
+  80500000    80500000    00f00000   00000000    rw- .sysmem
+  81400000    81400000    00002000   00000000    rw- .stack
+81402000    81402000    00001474   00001474    r-x
+  81402000    81402000    00001474   00001474    r-x .text
+81403474    81403474    00000851   00000000    rw-
+  81403474    81403474    00000820   00000000    rw- .data
+  81403c94    81403c94    00000031   00000000    rw- .bss
+81403cc8    81403cc8    00000318   00000318    r--
+  81403cc8    81403cc8    00000318   00000318    r-- .cinit
+
+
+SECTION ALLOCATION MAP
+
+ output                                  attributes/
+section   page    origin      length       input sections
+--------  ----  ----------  ----------   ----------------
+.sysmem    0    80500000    00f00000     UNINITIALIZED
+                  80500000    00000008     rtsv7A8_A_le_eabi.lib : memory.obj (.sysmem)
+                  80500008    00effff8     --HOLE--
+
+.stack     0    81400000    00002000     UNINITIALIZED
+                  81400000    00002000     --HOLE--
+
+.text      0    81402000    00001474     
+                  81402000    000008bc     hdmi_driver.obj (.text)
+                  814028bc    00000620     rtsv7A8_A_le_eabi.lib : memory.obj (.text)
+                  81402edc    00000180                           : memcpy32.obj (.text)
+                  8140305c    000000d4                           : auto_init.obj (.text)
+                  81403130    000000b0                           : memset32.obj (.text)
+                  814031e0    00000098                           : copy_decompress_rle.obj (.text)
+                  81403278    00000080                           : cpy_tbl.obj (.text)
+                  814032f8    00000078                           : exit.obj (.text)
+                  81403370    00000048                           : boot.obj (.text)
+                  814033b8    0000003c     main.obj (.text)
+                  814033f4    00000024     rtsv7A8_A_le_eabi.lib : _lock.obj (.text)
+                  81403418    00000020                           : copy_zero_init.obj (.text:decompress:ZI)
+                  81403438    00000020                           : args_main.obj (.text)
+                  81403458    00000014                           : copy_decompress_none.obj (.text:decompress:none)
+                  8140346c    00000008                           : copy_decompress_rle.obj (.text:decompress:rle24)
+
+.data      0    81403474    00000820     UNINITIALIZED
+                  81403474    00000800     hdmi_driver.obj (.data:font)
+                  81403c74    0000000c     rtsv7A8_A_le_eabi.lib : memory.obj (.data)
+                  81403c80    00000008                           : _lock.obj (.data)
+                  81403c88    00000008                           : exit.obj (.data)
+                  81403c90    00000004                           : stkdepth_vars.obj (.data)
+
+.bss       0    81403c94    00000031     UNINITIALIZED
+                  81403c94    00000004     (.common:buffSize)
+                  81403c98    00000004     (.common:currentLine)
+                  81403c9c    00000004     (.common:currentLineStart)
+                  81403ca0    00000004     (.common:currentRow)
+                  81403ca4    00000004     (.common:currentRowStart)
+                  81403ca8    00000004     (.common:framebuff)
+                  81403cac    00000004     (.common:screen_height)
+                  81403cb0    00000004     (.common:screen_width)
+                  81403cb4    00000004     (.common:window_height)
+                  81403cb8    00000004     (.common:window_offsetX)
+                  81403cbc    00000004     (.common:window_offsetY)
+                  81403cc0    00000004     (.common:window_width)
+                  81403cc4    00000001     (.common:scalingFactor)
+
+.cinit     0    81403cc8    00000318     
+                  81403cc8    000002f1     (.cinit..data.load) [load image, compression = rle]
+                  81403fb9    00000003     --HOLE-- [fill = 0]
+                  81403fbc    0000000c     (__TI_handler_table)
+                  81403fc8    00000008     (.cinit..bss.load) [load image, compression = zero_init]
+                  81403fd0    00000010     (__TI_cinit_table)
+
+
+LINKER GENERATED COPY TABLES
+
+__TI_cinit_table @ 81403fd0 records: 2, size/record: 8, table size: 16
+	.data: load addr=81403cc8, load size=000002f1 bytes, run addr=81403474, run size=00000820 bytes, compression=rle
+	.bss: load addr=81403fc8, load size=00000008 bytes, run addr=81403c94, run size=00000031 bytes, compression=zero_init
+
+
+LINKER GENERATED HANDLER TABLE
+
+__TI_handler_table @ 81403fbc records: 3, size/record: 4, table size: 12
+	index: 0, handler: __TI_zero_init
+	index: 1, handler: __TI_decompress_rle24
+	index: 2, handler: __TI_decompress_none
+
+
+GLOBAL SYMBOLS: SORTED ALPHABETICALLY BY Name 
+
+address    name
+--------   ----
+814032f8   C$$EXIT
+UNDEFED    SHT$$INIT_ARRAY$$Base
+UNDEFED    SHT$$INIT_ARRAY$$Limit
+81402000   __STACK_END
+00002000   __STACK_SIZE
+00f00000   __SYSMEM_SIZE
+81403fd0   __TI_CINIT_Base
+81403fe0   __TI_CINIT_Limit
+81403fbc   __TI_Handler_Table_Base
+81403fc8   __TI_Handler_Table_Limit
+00000001   __TI_args_main
+8140305c   __TI_auto_init
+81403c88   __TI_cleanup_ptr
+81403458   __TI_decompress_none
+8140346c   __TI_decompress_rle24
+81403c8c   __TI_dtors_ptr
+81403cc8   __TI_static_base__
+81403418   __TI_zero_init
+81403130   __aeabi_memclr
+81403130   __aeabi_memclr4
+81403130   __aeabi_memclr8
+81402edc   __aeabi_memcpy
+81402edc   __aeabi_memcpy4
+81402edc   __aeabi_memcpy8
+81403134   __aeabi_memset
+81403134   __aeabi_memset4
+81403134   __aeabi_memset8
+ffffffff   __binit__
+ffffffff   __c_args__
+81400000   __stack
+81403438   _args_main
+81403370   _c_int00
+81403c80   _lock
+8140340c   _nop
+81403400   _register_lock
+814033f4   _register_unlock
+80500000   _sys_memory
+81403c84   _unlock
+81403300   abort
+81402684   attachFrameBuffer
+ffffffff   binit
+81403c94   buffSize
+81402e78   calloc
+81403278   copy_in
+81403c98   currentLine
+81403c9c   currentLineStart
+81403ca0   currentRow
+81403ca4   currentRowStart
+814023d0   drawCharacter
+8140201c   drawCharacterWithColor
+814023e8   drawHorizontalLine
+8140259c   drawStringWithColor
+814024b0   drawVerticalLine
+8140330c   exit
+81403ca8   framebuff
+81402a68   free
+814033b8   main
+81403c90   main_func_sp
+814029b4   malloc
+81402d40   memalign
+81402edc   memcpy
+81403140   memset
+814028bc   minit
+814026c8   openHDMI
+81402bbc   realloc
+81403cc4   scalingFactor
+81403cac   screen_height
+81403cb0   screen_width
+81402000   setScale
+8140263c   setWindowOffset
+814025ec   setWindowSize
+81403cb4   window_height
+81403cb8   window_offsetX
+81403cbc   window_offsetY
+81403cc0   window_width
+814026b0   writeHDMI
+
+
+GLOBAL SYMBOLS: SORTED BY Symbol Address 
+
+address    name
+--------   ----
+00000001   __TI_args_main
+00002000   __STACK_SIZE
+00f00000   __SYSMEM_SIZE
+80500000   _sys_memory
+81400000   __stack
+81402000   __STACK_END
+81402000   setScale
+8140201c   drawCharacterWithColor
+814023d0   drawCharacter
+814023e8   drawHorizontalLine
+814024b0   drawVerticalLine
+8140259c   drawStringWithColor
+814025ec   setWindowSize
+8140263c   setWindowOffset
+81402684   attachFrameBuffer
+814026b0   writeHDMI
+814026c8   openHDMI
+814028bc   minit
+814029b4   malloc
+81402a68   free
+81402bbc   realloc
+81402d40   memalign
+81402e78   calloc
+81402edc   __aeabi_memcpy
+81402edc   __aeabi_memcpy4
+81402edc   __aeabi_memcpy8
+81402edc   memcpy
+8140305c   __TI_auto_init
+81403130   __aeabi_memclr
+81403130   __aeabi_memclr4
+81403130   __aeabi_memclr8
+81403134   __aeabi_memset
+81403134   __aeabi_memset4
+81403134   __aeabi_memset8
+81403140   memset
+81403278   copy_in
+814032f8   C$$EXIT
+81403300   abort
+8140330c   exit
+81403370   _c_int00
+814033b8   main
+814033f4   _register_unlock
+81403400   _register_lock
+8140340c   _nop
+81403418   __TI_zero_init
+81403438   _args_main
+81403458   __TI_decompress_none
+8140346c   __TI_decompress_rle24
+81403c80   _lock
+81403c84   _unlock
+81403c88   __TI_cleanup_ptr
+81403c8c   __TI_dtors_ptr
+81403c90   main_func_sp
+81403c94   buffSize
+81403c98   currentLine
+81403c9c   currentLineStart
+81403ca0   currentRow
+81403ca4   currentRowStart
+81403ca8   framebuff
+81403cac   screen_height
+81403cb0   screen_width
+81403cb4   window_height
+81403cb8   window_offsetX
+81403cbc   window_offsetY
+81403cc0   window_width
+81403cc4   scalingFactor
+81403cc8   __TI_static_base__
+81403fbc   __TI_Handler_Table_Base
+81403fc8   __TI_Handler_Table_Limit
+81403fd0   __TI_CINIT_Base
+81403fe0   __TI_CINIT_Limit
+ffffffff   __binit__
+ffffffff   __c_args__
+ffffffff   binit
+UNDEFED    SHT$$INIT_ARRAY$$Base
+UNDEFED    SHT$$INIT_ARRAY$$Limit
+
+[76 symbols]

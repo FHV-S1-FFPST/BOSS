@@ -1,0 +1,1 @@
+"./src/serial_driver.obj" "./src/main.obj" "../boss_task_linker_script.cmd" -l"libc.a" 

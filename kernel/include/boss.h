@@ -16,8 +16,10 @@
  */
 
 // agreed channel-ids /////////////////////////////////////////////////////////
-#define KEY_IN_CHANNEL			0
-#define TIMER_CHANNEL			1
+#define NULL_CHANNEL			0
+#define SERIAL_CHANNEL			1
+#define HDMI_CHANNEL			2
+#define TASKS_CHANNEL			3
 ///////////////////////////////////////////////////////////////////////////////
 
 // Sys-Call IDs ///////////////////////////////////////////////////////////////
@@ -54,6 +56,15 @@
 
 typedef int32_t (*task_func) ( void* args );
 
+// SYSTEM-STRCUTURES
+
+typedef struct
+{
+	uint8_t id;
+	uint8_t* data;
+	uint8_t dataSize;
+} MESSAGE;
+
 // SYSTEM-CALLS ///////////////////////////////////////////////////////////////
 
 // IPC calls
@@ -61,18 +72,18 @@ typedef int32_t (*task_func) ( void* args );
  * Blocking send of dataSize bytes stored in buffer data to channel found in channelId
  * There must be a receiver to consume the data
  */
-int32_t send( uint32_t channelId, uint8_t* data, uint8_t dataSize );
+int32_t send( uint32_t channelId, MESSAGE* msg );
 
 /**
  * Blocking receive of max dataSize bytes to buffer data from channel found in channelId
  * 	Returns the amount of bytes stored in dataSize
  */
-int32_t receive( uint32_t channelId, uint8_t* data, uint8_t dataSize );
+int32_t receive( uint32_t channelId, MESSAGE* msg );
 
 /**
  * TODO: describe and specify
  */
-int32_t sendrcv( uint32_t channelId, uint8_t* data, uint8_t dataSize );
+int32_t sendrcv( uint32_t channelId, MESSAGE* sendMsg, MESSAGE* rcvMsg );
 
 // Task-management calls
 /**
@@ -87,6 +98,7 @@ int32_t fork();
 
 /**
  * Suspends the task for at least the given milliseconds.
+ * TODO: replace by a receive on the null-channel with a given timeout of millis
  */
 int32_t sleep( uint32_t millis );
 

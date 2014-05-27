@@ -71,20 +71,21 @@ swiHandler( uint32_t swiId, UserContext* ctx )
 
 	if ( SYSC_SEND == swiId || SYSC_RECEIVE == swiId || SYSC_SENDRCV == swiId )
 	{
-		uint8_t* data = ( uint8_t* ) ctx->regs[ 1 ];
-		uint8_t dataSize = ( uint8_t ) ctx->regs[ 2 ];
+		MESSAGE* msg = ( MESSAGE* ) ctx->regs[ 1 ];
 
 		if ( SYSC_SEND == swiId )
 		{
-			ret = send( ctx->regs[ 0 ], data, dataSize );
+			ret = send( ctx->regs[ 0 ], msg );
 		}
 		else if ( SYSC_RECEIVE == swiId )
 		{
-			ret = receive( ctx->regs[ 0 ], data, dataSize );
+			ret = receive( ctx->regs[ 0 ], msg );
 		}
 		else if ( SYSC_SENDRCV == swiId )
 		{
-			ret = sendrcv( ctx->regs[ 0 ], data, dataSize );
+			MESSAGE* sndMsg = ( MESSAGE* ) ctx->regs[ 2 ];
+
+			ret = sendrcv( ctx->regs[ 0 ], msg, sndMsg );
 		}
 	}
 	else if ( SYSC_CREATETASK == swiId )

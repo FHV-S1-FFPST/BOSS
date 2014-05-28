@@ -17,9 +17,9 @@ extern void _mmu_init();
 extern void _mmu_activate();
 
 void mmu_initPagetable(Pagetable* pt);
-void mmu_mapRegion(Region* reg);
-void mmu_mapSectionTableRegion(Region* reg);
-void mmu_mapCoarseTableRegion(Region* reg);
+void mmu_mapRegion(Region* reg, uint32_t processID);
+void mmu_mapSectionTableRegion(Region* reg, uint32_t processID);
+void mmu_mapCoarseTableRegion(Region* reg, uint32_t processID);
 
 void ttbSet(unsigned int ttb);
 void tlbFlush(void);
@@ -98,7 +98,7 @@ void mmu_mapRegion(Region* reg, uint32_t processID) {
 
 	switch(reg->ptType) {
 	case MASTER:
-		mmu_mapSectionTableRegion(reg);
+		mmu_mapSectionTableRegion(reg, processID);
 		break;
 	case COARSE:
 		mmu_mapCoarseTableRegion(reg, processID);
@@ -160,7 +160,7 @@ void mmu_mapCoarseTableRegion(Region* reg, uint32_t processID) {
 				PTE = regPAdressTemp & 0xFFFFF000;
 				regPAdressTemp += 0x1000;
 			} else {
-				PTE = getFreePage(processID) & 0xFFFFF000;
+				PTE = ((uint32_t)getFree4KPage(processID)) & 0xFFFFF000;
 			}
 
 			PTE |= reg->AP << 10;
@@ -180,15 +180,23 @@ void mmu_mapCoarseTableRegion(Region* reg, uint32_t processID) {
 
 }
 
-void mmu_mapSectionTableRegion(Region* reg) {
+void mmu_mapSectionTableRegion(Region* reg, uint32_t processID) {
 	uint32_t* master = ( uint32_t *) 0x80000000;		// get master page table
 	uint32_t tempVAdress = reg->vAddress;				// get start address of region
-	uint32_t tempPAdress = reg->physicalStartAdress;
+	uint32_t tempPAdress;
 	uint32_t PTE = 0;
 
 	uint32_t i;
 
+
+	if(reg->mappingType == Fixed) {
+		tempPAdress = reg->physicalStartAdress;
+	} else {
+		tempPAdress = (uint32_t)getFree1MPage(processID);
+	}
+
 	for(i = 0; i < reg->numPages; i++) {					// iterate through all pages
+
 		uint32_t index = (tempVAdress >> 20) & 0x00000FFF;	// get base of virtual address [20:31]
 
 		PTE = 0;
@@ -200,7 +208,12 @@ void mmu_mapSectionTableRegion(Region* reg) {
 
 		master[ index ] = PTE;
 		tempVAdress += 0x100000;						// increase address to next index of virtual memory (1 MB)
-		tempPAdress += 0x100000;						// increase address to next index of physical memory (1 MB)
+
+		if(reg->mappingType == Fixed) {
+			tempPAdress += 0x100000;						// increase address to next index of physical memory (1 MB)
+		} else {
+			tempPAdress = (uint32_t)getFree1MPage(processID);
+		}
 	}
 }
 

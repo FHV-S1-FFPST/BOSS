@@ -16,7 +16,7 @@ uint8_t initPageManager(void) {
 	return 0;
 }
 
-static uint32_t* getFreePageAbstract(uint32_t numPages, uint32_t processID) {
+uint32_t* getFreePageAbstract(uint32_t numPages, uint32_t processID) {
 		int i;
 		uint32_t freePagesInRow = 0;
 		uint32_t startIndexToAllocate = 0;
@@ -41,7 +41,7 @@ static uint32_t* getFreePageAbstract(uint32_t numPages, uint32_t processID) {
 		}
 
 		if(freePagesInRow != numPages) {
-			return null;
+			return 0;
 		} else {
 			endIndexToAllocate = startIndexToAllocate + numPages;
 			for(i = startIndexToAllocate; i <= endIndexToAllocate; i++ ) {
@@ -51,6 +51,15 @@ static uint32_t* getFreePageAbstract(uint32_t numPages, uint32_t processID) {
 		}
 
 		return (uint32_t *)(PAGE_START_ADDR + startIndexToAllocate * 4096);
+}
+
+void freePageAbstract(uint32_t* page, uint32_t pageCount) {
+	uint32_t index = (((uint32_t) page) - PAGE_START_ADDR) / 4096;
+	int i;
+
+	for(i = index; i < pageCount; i++) {
+		stati[i].inUse = 0;
+	}
 }
 
 uint32_t* getFree4KPage(uint32_t processID) {
@@ -63,15 +72,6 @@ uint32_t* getFree64KPage(uint32_t processID) {
 
 uint32_t* getFree1MPage(uint32_t processID) {
 	return getFreePageAbstract(256, processID);
-}
-
-static void freePageAbstract(uint32_t* page, uint32_t pageCount) {
-	uint32_t index = (((uint32_t) page) - PAGE_START_ADDR) / 4096;
-	int i;
-
-	for(i = 0; i < pageCount; i++) {
-		stati[i].inUse = 0;
-	}
 }
 
 void free4KPage(uint32_t* page) {

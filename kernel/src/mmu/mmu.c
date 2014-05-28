@@ -81,10 +81,10 @@ uint32_t mmu_init(void) {
 
 	mmu_initPagetable(&masterPT);
 
-	mmu_mapRegion(&osRegion);
-	mmu_mapRegion(&peripheralRegion);
-	mmu_mapRegion(&pageTableRegion);
-	mmu_mapRegion(&sramRegion);
+	mmu_mapRegion(&osRegion, 0);
+	mmu_mapRegion(&peripheralRegion, 0);
+	mmu_mapRegion(&pageTableRegion, 0);
+	mmu_mapRegion(&sramRegion, 0);
 
 	_ttb_set(MASTER_PT);
 	_mmu_init();
@@ -94,14 +94,14 @@ uint32_t mmu_init(void) {
 }
 
 // initializes Pagetables for Regions
-void mmu_mapRegion(Region* reg) {
+void mmu_mapRegion(Region* reg, uint32_t processID) {
 
 	switch(reg->ptType) {
 	case MASTER:
 		mmu_mapSectionTableRegion(reg);
 		break;
 	case COARSE:
-		mmu_mapCoarseTableRegion(reg);
+		mmu_mapCoarseTableRegion(reg, processID);
 		break;
 	default:
 		break;
@@ -109,7 +109,11 @@ void mmu_mapRegion(Region* reg) {
 
 }
 
-void mmu_mapCoarseTableRegion(Region* reg) {
+void addProcess() {
+
+}
+
+void mmu_mapCoarseTableRegion(Region* reg, uint32_t processID) {
 
 	uint32_t *masterPT = (uint32_t *) 0x80000000;
 	uint32_t numPageTables = (reg->numPages / 256) + 1;
@@ -148,7 +152,7 @@ void mmu_mapCoarseTableRegion(Region* reg) {
 			pagesToWrite = 256;
 		}
 
-		// TODO: write l2 table
+		// write l2 table
 		for(j = 0; j < pagesToWrite; j++) {
 			PTE = 0;
 
@@ -156,7 +160,7 @@ void mmu_mapCoarseTableRegion(Region* reg) {
 				PTE = regPAdressTemp & 0xFFFFF000;
 				regPAdressTemp += 0x1000;
 			} else {
-				PTE = getFreePage(0) & 0xFFFFF000;
+				PTE = getFreePage(processID) & 0xFFFFF000;
 			}
 
 			PTE |= reg->AP << 10;
@@ -171,7 +175,6 @@ void mmu_mapCoarseTableRegion(Region* reg) {
 		}
 
 		regVAdressTemp += 0x100000;
-
 	}
 
 

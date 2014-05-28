@@ -12,6 +12,7 @@
 #include "../timer/systimer.h"
 #include "../common/common.h"
 #include "../irq/irq.h"
+#include "../scheduler/scheduler.h"
 
 // third includes: project-includes
 #include <boss.h>
@@ -26,7 +27,7 @@
 static uint64_t systemMillis;
 // module-local functions /////////////////////////////////////////
 static uint32_t handleSystemTimerOverflow( UserContext* ctx );
-static uint32_t getSysMillisSysCall( void );
+static int32_t getSysMillisSysCall( void );
 ///////////////////////////////////////////////////////////////////
 
 int32_t
@@ -34,15 +35,6 @@ initCore( void )
 {
 	sysTimerInit( SYSTIMER_OVERFLOW_INTERVAL_MS );
 	irqRegisterClbk( handleSystemTimerOverflow, GPT10_IRQ );
-
-	/*
-	// TODO: this shouldnt be necessary anymore because this is handled inside timer
-	// NOTE: need to waste some time, otherwise IRQ won't hit
-	// TODO: this leads to errors
-	volatile uint32_t i = 100000;
-	while ( i > 0 )
-		--i;
-	*/
 
 	return 0;
 }
@@ -57,7 +49,6 @@ SystemState
 querySystemState( void )
 {
 	uint32_t cpsr = _get_CPSR();
-	// TODO: use reg32* macros
 	return BIT_CLEAR( cpsr, ~0x1F );
 }
 
@@ -79,20 +70,30 @@ swiHandler( uint32_t swiId, UserContext* ctx )
 		}
 		else if ( SYSC_RECEIVE == swiId )
 		{
-			ret = receive( ctx->regs[ 0 ], msg );
+			ret = receive( ctx->regs[ 0 ], msg, ( int32_t ) ctx->regs[ 2 ] );
 		}
 		else if ( SYSC_SENDRCV == swiId )
 		{
-			MESSAGE* sndMsg = ( MESSAGE* ) ctx->regs[ 2 ];
-
-			ret = sendrcv( ctx->regs[ 0 ], msg, sndMsg );
+			ret = sendrcv( ctx->regs[ 0 ], msg, ctx->regs[ 2 ] );
 		}
+	}
+	else if ( SYSC_CH_OPEN == swiId )
+	{
+		ret = channelOpen( ctx->regs[ 0 ] );
+	}
+	else if ( SYSC_CH_CLOSE == swiId )
+	{
+		ret = channelClose( ctx->regs[ 0 ] );
+	}
+	else if ( SYSC_CH_ATTACH == swiId )
+	{
+		ret = channelAttach( ctx->regs[ 0 ] );
 	}
 	else if ( SYSC_CREATETASK == swiId )
 	{
-		task_func entryPoint = ( task_func ) ctx->regs[ 0 ];
-
-		ret = createTask( entryPoint );
+		//task_func entryPoint = ( task_func ) ctx->regs[ 0 ];
+		//ret = createTask( entryPoint );
+		ret = 1;
 	}
 	else if ( SYSC_FORK == swiId )
 	{
@@ -103,6 +104,10 @@ swiHandler( uint32_t swiId, UserContext* ctx )
 		ret = sleep( ctx->regs[ 0 ] );
 	}
 	else if ( SYSC_SYSMILLIS == swiId )
+	{
+		ret = getSysMillisSysCall();
+	}
+	else if ( SYSC_PID == swiId )
 	{
 		ret = getSysMillisSysCall();
 	}
@@ -132,7 +137,7 @@ void undefInstrHandler()
 	// implement when necessary
 }
 
-uint32_t
+int32_t
 getSysMillisSysCall( void )
 {
 	uint64_t sysMillis = getSysMillis();
@@ -144,6 +149,13 @@ getSysMillisSysCall( void )
 	return 0;
 }
 
+int32_t
+getPid( void )
+{
+	currentUserCtx->regs[ 0 ] = getCurrentPid();
+
+	return 0;
+}
 
 uint32_t
 handleSystemTimerOverflow( UserContext* ctx )

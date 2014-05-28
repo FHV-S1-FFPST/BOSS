@@ -93,6 +93,13 @@ uint32_t mmu_init(void) {
 	return 0;
 }
 
+uint32_t
+mmu_allocateTask( uint32_t pid, uint32_t size )
+{
+	// TODO: implement
+	return 0;
+}
+
 // initializes Pagetables for Regions
 void mmu_mapRegion(Region* reg, uint32_t processID) {
 

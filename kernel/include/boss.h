@@ -38,6 +38,7 @@
 
 // MISC CALLS
 #define SYSC_SYSMILLIS			17
+#define SYSC_PID				18
 ///////////////////////////////////////////////////////////////////////////////
 
 // defined SWI-aliases for the given sys-calls for user-apps //////////////////
@@ -52,16 +53,17 @@
 	#pragma SWI_ALIAS( sendrcv, SYSC_SENDRCV );
 
 	// TASK-MANAGEMENT CALLS
-	#pragma SWI_ALIAS( createTask, SYSC_CREATETASK );
+	//#pragma SWI_ALIAS( createTask, SYSC_CREATETASK );
 	#pragma SWI_ALIAS( fork, SYSC_FORK );
 	#pragma SWI_ALIAS( sleep, SYSC_SLEEP );
 
 	// MISC CALLS
 	#pragma SWI_ALIAS( getSysMillis, SYSC_SYSMILLIS );
+	#pragma SWI_ALIAS( getPid, SYSC_PID );
 #endif
 ///////////////////////////////////////////////////////////////////////////////
 
-typedef int32_t (*task_func) ( void* args );
+//typedef int32_t (*task_func) ( void* args );
 
 // SYSTEM-STRCUTURES
 
@@ -111,7 +113,7 @@ int32_t send( uint32_t channelId, MESSAGE* msg );
  * If timeout is 0, it will block forever.
  * If timeout is -1, it will return immediately if no message is present and will have msg set to 0.
  */
-int32_t receive( uint32_t channelId, MESSAGE* msg, uint32_t timeout );
+int32_t receive( uint32_t channelId, MESSAGE* msg, int32_t timeout );
 
 /**
  * Sends a message and receives a response waiting for timeout milliseconds.
@@ -124,7 +126,7 @@ int32_t sendrcv( uint32_t channelId, MESSAGE* msg, uint32_t timeout );
 /**
  * Starts a process from the given process-function.
  */
-int32_t createTask( task_func entryPoint );
+//int32_t createTask( task_func entryPoint );
 
 /**
  * Forks the task. Will return 0 for the child-task and > 0 for the parent-task.
@@ -141,6 +143,11 @@ int32_t sleep( uint32_t millis );
  * Returns the milliseconds since the system was started.
  */
 uint64_t getSysMillis();
+
+/**
+ * Returns the pid of the current process
+ */
+int32_t getPid();
 ///////////////////////////////////////////////////////////////////////////////
 
 #endif /* BOSS_H_ */

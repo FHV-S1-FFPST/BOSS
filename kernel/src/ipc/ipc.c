@@ -8,25 +8,49 @@
 #include "ipc.h"
 
 int32_t
+channelOpen( uint32_t channelId )
+{
+	// TODO: implement
+
+	return 0;
+}
+
+int32_t
+channelClose( uint32_t channelId )
+{
+	// TODO: implement
+
+	return 0;
+}
+
+int32_t
+channelAttach( uint32_t channelId )
+{
+	// TODO: implement
+
+	return 0;
+}
+
+int32_t
 send( uint32_t channelId, MESSAGE* msg )
 {
 	// TODO: implement
 
-	return 31;
+	return 0;
 }
 
 int32_t
-receive( uint32_t channelId, MESSAGE* msg )
+receive( uint32_t channelId, MESSAGE* msg, int32_t timeout )
 {
 	// TODO: implement
 
-	return 32;
+	return 0;
 }
 
 int32_t
-sendrcv( uint32_t channelId, MESSAGE* sendMsg, MESSAGE* rcvMsg )
+sendrcv( uint32_t channelId, MESSAGE* sendMsg, uint32_t timeout )
 {
 	// TODO: implement
 
-	return 33;
+	return 0;
 }

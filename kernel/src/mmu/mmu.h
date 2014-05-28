@@ -67,6 +67,8 @@ typedef struct {
 	MappingType mappingType;
 } Region;
 
-uint32_t mmu_init(void);
+uint32_t mmu_init( void );
+
+uint32_t mmu_allocateTask( uint32_t pid, uint32_t size );
 
 #endif /* MMU_H_ */

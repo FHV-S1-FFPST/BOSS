@@ -8,6 +8,8 @@
 #include "taskLoader.h"
 
 #include "../fs/fat32/fat32.h"
+#include "../scheduler/scheduler.h"
+#include "../page_manager/pageManager.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -79,6 +81,7 @@ loadTaskFromFile( const char* fileName )
 	uint8_t* fileBuffer = 0;
 	file_id taskImageFile = 0;
 	ELF_HEADER* elfHeader = 0;
+	Task* task = 0;
 
 	if ( fat32Open( fileName, &taskImageFile ) )
 	{
@@ -140,6 +143,13 @@ loadTaskFromFile( const char* fileName )
 		goto closeAndExit;
 	}
 
+	task = createTask( ( uint32_t* ) elfHeader->e_entry, fileSize );
+	if ( 0 == task )
+	{
+		ret = 1;
+		goto closeAndExit;
+	}
+
 	for ( i = 0; i < elfHeader->e_phnum; ++i )
 	{
 		PROGRAM_HEADER* programHeader = ( PROGRAM_HEADER* ) &fileBuffer[ elfHeader->e_phoff + ( i * elfHeader->e_phentsize ) ];
@@ -149,10 +159,7 @@ loadTaskFromFile( const char* fileName )
 			continue;
 		}
 
-		if ( programHeader->p_flags | PF_X )
-		{
-
-		}
+		memcpy( ( uint32_t* ) programHeader->p_vaddr, &fileBuffer[ programHeader->p_offset ], programHeader->p_memsz );
 	}
 
 	ret = 0;

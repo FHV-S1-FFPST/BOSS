@@ -16,6 +16,7 @@
 #include "../task/taskTable.h"
 #include "../timer/irqtimer.h"
 #include "../irq/irq.h"
+#include "../mmu/mmu.h"
 
 /* NOTES ABOUT SCHEDULING AND PC HANDLING //////////////////////////////////////////////////////////////////////////////////////////////////
 fact1: during an IRQ the current OP is canceled and the PC incremented
@@ -70,29 +71,22 @@ static uint32_t runningPID = 0;
 static uint32_t schedule( UserContext* ctx );
 static uint32_t scheduleNextReady( UserContext* ctx );
 static Task* getNextReady();
-static void initializeTask( Task* task, task_func entryPoint );
-static int32_t idleTaskFunc( void* args );
+static void initializeTask( Task* task, uint32_t* entryPoint );
+static int32_t idleTaskFunc( void );
 static void saveCtxToTask( UserContext* ctx, Task* task );
 static void restoreCtxFromTask( UserContext* ctx, Task* task );
 static uint32_t saveCurrentRunning( UserContext* ctx );
 static void allocateStackPointer( Task* task );
-static Task* createTaskInternal( task_func entryPoint );
 ///////////////////////////////////////////////////////////////////
 
 uint32_t
 schedInit()
 {
 	// create idle-task first, it MUST BE at pid 0
-	createTask( idleTaskFunc );
+	createTask( ( uint32_t* ) idleTaskFunc, 0 );
 
 	irqRegisterClbk( schedule, GPT2_IRQ );
 	irqTimerInit( SCHEDULE_INTERVAL_MS );
-
-	// TODO: this shouldnt be necessary anymore because this is handled inside timer
-	// NOTE: need to waste some time, otherwise IRQ won't hit
-	volatile uint32_t i = 100000;
-	while ( i > 0 )
-		--i;
 
 	return 0;
 }
@@ -103,17 +97,14 @@ schedStart()
 	irqTimerStart();
 }
 
-
 int32_t
-createTask( task_func entryPoint )
+getCurrentPid( void )
 {
-	createTaskInternal( entryPoint );
-
-	return 0;
+	return runningPID;
 }
 
 Task*
-createTaskInternal( task_func entryPoint )
+createTask( uint32_t* entryPoint, uint32_t size )
 {
 	Task newTask;
 
@@ -123,14 +114,17 @@ createTaskInternal( task_func entryPoint )
 
 	addTask( &newTask );
 
+	mmu_allocateTask( newTask.pid, size );
+
 	return getTask( newTask.pid );
 }
 
-// TODO: merge fork and create task into one and pull out specific stuff for fork
 int32_t
 fork()
 {
-	Task* newTask = createTaskInternal( ( task_func ) currentUserCtx->pc );
+	// TODO: pc is other space, need to calculate it according to the image
+
+	Task* newTask = createTask( currentUserCtx->pc, 0 );
 
 	// the child process will receive the content of the registers of the parent process
 	memcpy( newTask->reg, currentUserCtx->regs, sizeof( newTask->reg ) );
@@ -151,7 +145,7 @@ sleep( uint32_t millis )
 
 	Task* runningTask = getTask( runningPID );
 	runningTask->state = SLEEPING;
-	runningTask->sleepUntil = systemMillis + millis;
+	runningTask->waitUntil = systemMillis + millis;
 
 	// TODO: problem: when new to schedule task has never run, the PC will point one instruction too far because createtask incremented it
 	// 		 it is ok when it already ran because the current instruction is interrupted by the IRQ and thus not executed and needs to be executed again
@@ -278,7 +272,7 @@ getNextReady()
 		// task is sleeping, check if sleep until timelimit has hit
 		if ( SLEEPING == task->state )
 		{
-			if ( task->sleepUntil <= currentMillis )
+			if ( task->waitUntil <= currentMillis )
 			{
 				task->state = READY;
 				return task;
@@ -325,18 +319,18 @@ allocateStackPointer( Task* task )
 }
 
 void
-initializeTask( Task* task, task_func entryPoint )
+initializeTask( Task* task, uint32_t* entryPoint )
 {
 	memset( task, 0, sizeof( Task ) );
 
 	task->state = READY;
 	task->pid = getNextFreePID();
-	task->initPC = ( uint32_t* ) entryPoint;
+	task->initPC = entryPoint;
 	task->cpsr = USERMODE_WITHIRQ_CPSR;
 }
 
 int32_t
-idleTaskFunc( void* args )
+idleTaskFunc( void )
 {
 	volatile uint32_t counter = 0;
 

@@ -8,9 +8,11 @@
 #ifndef SCHEDULER_H_
 #define SCHEDULER_H_
 
-#include <inttypes.h>
+#include "../task/task.h"
 
 uint32_t schedInit( void );
+int32_t getCurrentPid( void );
+Task* createTask( uint32_t* entryPoint, uint32_t size );
 void schedStart( void );
 
 #endif /* SCHEDULER_H_ */

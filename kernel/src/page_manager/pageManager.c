@@ -22,7 +22,7 @@ uint32_t* getFreePageAbstract(uint32_t numPages, uint32_t processID) {
 		uint32_t startIndexToAllocate = 0;
 		uint32_t endIndexToAllocate = 0;
 
-		for(i = 0; i < PAGE_COUNT; i++) {
+		for(i = 0; i < PAGE_COUNT; ++i) {
 			if(stati[i].inUse == 0) {
 
 				if(freePagesInRow == 0) {

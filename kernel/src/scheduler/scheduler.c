@@ -83,7 +83,7 @@ uint32_t
 schedInit()
 {
 	// create idle-task first, it MUST BE at pid 0
-	createTask( ( uint32_t* ) idleTaskFunc, 0 );
+	createTask( ( uint32_t* ) idleTaskFunc );
 
 	irqRegisterClbk( schedule, GPT2_IRQ );
 	irqTimerInit( SCHEDULE_INTERVAL_MS );
@@ -104,7 +104,7 @@ getCurrentPid( void )
 }
 
 Task*
-createTask( uint32_t* entryPoint, uint32_t size )
+createTask( uint32_t* entryPoint )
 {
 	Task newTask;
 
@@ -114,7 +114,7 @@ createTask( uint32_t* entryPoint, uint32_t size )
 
 	addTask( &newTask );
 
-	mmu_allocateTask( newTask.pid, size );
+	mmu_allocateTask( newTask.pid );
 
 	return getTask( newTask.pid );
 }
@@ -124,7 +124,7 @@ fork()
 {
 	// TODO: pc is other space, need to calculate it according to the image
 
-	Task* newTask = createTask( currentUserCtx->pc, 0 );
+	Task* newTask = createTask( currentUserCtx->pc );
 
 	// the child process will receive the content of the registers of the parent process
 	memcpy( newTask->reg, currentUserCtx->regs, sizeof( newTask->reg ) );

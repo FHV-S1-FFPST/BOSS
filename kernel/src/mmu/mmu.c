@@ -7,15 +7,87 @@
 
 #include "mmu.h"
 
-#define MASTER_PT 0x80000000
+// module-local defines
+#define MASTER_PT 					0x80000000
 
+#define MASTER_PT_VADDR				0x00000000
+
+#define OS_REGION_VADDR				0x80500000
+#define PERIPHERAL_REGION_VADDR		0x48000000
+#define PAGETABLE_REGION_PADDR		0x80000000
+#define SRAM_REGION_VADDR			0x40200000
+#define TASK_REGION_VADDR			0x02100000
+
+#define DOM3CLT 					0xC0
+#define CHANGEALLDOM				0xFFFFFFFF
+
+#define ENABLEMMU 					0x0001
+#define ENABLEDCACHE 				0x0004
+#define ENABLEICACHE 				0x1000
+#define CHANGEMMU 					0x0001
+#define CHANGEDCACHE 				0x0004
+#define CHANGEICACHE 				0x1000
+////////////////////////////////////////////////////////
+
+
+// module-local structures
+typedef enum {
+	FAULT = 0,
+	MASTER = 1,
+	COARSE = 2
+} PageTableType;
+
+typedef enum {
+	NoAccessTwiceBitch = 0,
+	ReadWriteNoAccess = 1,
+	ReadWriteReadOnly = 2,
+	ReadWriteTwiceBitch = 3
+} AccessProtectionType;
+
+typedef enum {
+	NotCachedNotBuffered = 0,
+	NotCachedBuffered = 1,
+	WriteThrough = 2,
+	WriteBack = 3
+} CacheType;
+
+typedef enum {
+	Fixed = 0,
+	Dynamic = 1
+} MappingType;
+
+typedef struct {
+	uint32_t vAddress;				// virtuelle Startadresse des Bereiches den diese Pagetable übernimmt
+	uint32_t ptAddress;				// virtuelle Adresse der Pagetable
+	uint32_t ptAddressPhysical;		// physische Adresse der Pagetable
+	PageTableType type;				// pagetable type
+	uint8_t domain;
+} Pagetable;
+
+typedef struct {
+	uint32_t vAddress;				// virtuelle Startadresse der Region
+	uint32_t physicalStartAdress;	// physische Startadresse der Region
+	uint32_t numPages;				// anzahl der pages in region
+	uint16_t pageSize;				// page size
+	AccessProtectionType AP;		// access permission
+	CacheType CB;					// cache and write buffer attributes
+	PageTableType ptType;
+	MappingType mappingType;
+} Region;
+////////////////////////////////////////////////////////
+
+
+// prototypes for functions implemented in asm
 extern void _ttb_set(unsigned int ttb);
 extern void _tlb_flush(unsigned int c8format);
 extern void _pid_set(unsigned int pid);
 extern void _mmu_setDomainAccess(unsigned int value, unsigned int mask);
 extern void _mmu_init();
 extern void _mmu_activate();
+////////////////////////////////////////////////////////
 
+
+// module-local function prototypes
 void mmu_initPagetable(Pagetable* pt);
 void mmu_mapRegion(Region* reg, uint32_t processID);
 void mmu_mapSectionTableRegion(Region* reg, uint32_t processID);
@@ -25,66 +97,103 @@ void ttbSet(unsigned int ttb);
 void tlbFlush(void);
 void setProcessID(unsigned int pid);
 void domainAccessSet(uint32_t value, uint32_t mask);
+////////////////////////////////////////////////////////
 
-uint32_t *nextFreePT;
+
+// Modul-local DATA
+uint32_t* nextFreePT;
+
+Pagetable _masterPT = {
+	.vAddress = MASTER_PT_VADDR,
+	.ptAddress = MASTER_PT,
+	.ptAddressPhysical = MASTER_PT,
+	.type = MASTER,
+	.domain = 3
+};
+
+Region _osRegion =
+{
+	.pageSize = 1024,
+	.numPages = 32,
+	.vAddress = OS_REGION_VADDR,
+	.physicalStartAdress = OS_REGION_VADDR,
+	.AP = ReadWriteNoAccess,
+	.CB = WriteBack,
+	.ptType = MASTER,
+	.mappingType = Fixed
+};
+
+Region _peripheralRegion =
+{
+	.pageSize = 1024,
+	.numPages = 896,
+	.vAddress = PERIPHERAL_REGION_VADDR,
+	.physicalStartAdress = PERIPHERAL_REGION_VADDR,
+	.AP = ReadWriteNoAccess,
+	.CB = NotCachedNotBuffered,
+	.ptType = MASTER,
+	.mappingType = Fixed
+};
+
+Region _pageTableRegion =
+{
+	.pageSize = 1024,
+	.numPages = 5,
+	.vAddress = MASTER_PT,
+	.physicalStartAdress = PAGETABLE_REGION_PADDR,
+	.AP = ReadWriteNoAccess,
+	.CB = WriteBack,
+	.ptType = MASTER,
+	.mappingType = Fixed
+};
+
+Region _sramRegion =
+{
+	.pageSize = 4,
+	.numPages = 16,
+	.vAddress = SRAM_REGION_VADDR,
+	.physicalStartAdress = SRAM_REGION_VADDR,
+	.AP = ReadWriteNoAccess,
+	.CB = WriteBack,
+	.ptType = COARSE,
+	.mappingType = Fixed
+};
+
+Region _taskRegionTemplate =
+{
+	.pageSize = 1024,
+	.numPages = 1,
+	.vAddress = TASK_REGION_VADDR,
+	.physicalStartAdress = TASK_REGION_VADDR,
+	.AP = ReadWriteNoAccess,
+	.CB = WriteBack,
+	.ptType = MASTER,
+	.mappingType = Dynamic
+};
+
+Region _memMapRegionTemplate =
+{
+	.pageSize = 4,
+	.numPages = 0,
+	.vAddress = 0,
+	.physicalStartAdress = 0,
+	.AP = ReadWriteNoAccess,
+	.CB = WriteBack,
+	.ptType = COARSE,
+	.mappingType = Dynamic
+};
+/////////////////////////////////////////////////////
 
 uint32_t mmu_init(void) {
 
 	nextFreePT = (uint32_t *) 0x80004000;
 
-	Pagetable masterPT;
-	masterPT.vAddress = 0x00000000;
-	masterPT.ptAddress = MASTER_PT;
-	masterPT.ptAddressPhysical = MASTER_PT;
-	masterPT.type = MASTER;
-	masterPT.domain = 3;
+	mmu_initPagetable(&_masterPT);
 
-	Region osRegion;
-	osRegion.pageSize = 1024;
-	osRegion.numPages = 32;
-	osRegion.vAddress = 0x80500000;
-	osRegion.physicalStartAdress = 0x80500000;
-	osRegion.AP = ReadWriteNoAccess;
-	osRegion.CB = WriteBack;
-	osRegion.ptType = MASTER;
-	osRegion.mappingType = Fixed;
-
-	Region peripheralRegion;
-	peripheralRegion.pageSize = 1024;
-	peripheralRegion.numPages = 896;
-	peripheralRegion.vAddress = 0x48000000;
-	peripheralRegion.physicalStartAdress = 0x48000000;
-	peripheralRegion.AP = ReadWriteNoAccess;
-	peripheralRegion.CB = NotCachedNotBuffered;
-	peripheralRegion.ptType = MASTER;
-	peripheralRegion.mappingType = Fixed;
-
-	Region pageTableRegion;
-	pageTableRegion.pageSize = 1024;
-	pageTableRegion.numPages = 5;
-	pageTableRegion.vAddress = MASTER_PT;
-	pageTableRegion.physicalStartAdress = 0x80000000;
-	pageTableRegion.AP = ReadWriteNoAccess;
-	pageTableRegion.CB = WriteBack;
-	pageTableRegion.ptType = MASTER;
-	pageTableRegion.mappingType = Fixed;
-
-	Region sramRegion;
-	sramRegion.pageSize = 4;
-	sramRegion.numPages = 16;
-	sramRegion.vAddress = 0x40200000;
-	sramRegion.physicalStartAdress = 0x40200000;
-	sramRegion.AP = ReadWriteNoAccess;
-	sramRegion.CB = WriteBack;
-	sramRegion.ptType = COARSE;
-	sramRegion.mappingType = Fixed;
-
-	mmu_initPagetable(&masterPT);
-
-	mmu_mapRegion(&osRegion, 0);
-	mmu_mapRegion(&peripheralRegion, 0);
-	mmu_mapRegion(&pageTableRegion, 0);
-	mmu_mapRegion(&sramRegion, 0);
+	mmu_mapRegion(&_osRegion, 0);
+	mmu_mapRegion(&_peripheralRegion, 0);
+	mmu_mapRegion(&_pageTableRegion, 0);
+	mmu_mapRegion(&_sramRegion, 0);
 
 	_ttb_set(MASTER_PT);
 	_mmu_init();
@@ -94,9 +203,31 @@ uint32_t mmu_init(void) {
 }
 
 uint32_t
-mmu_allocateTask( uint32_t pid, uint32_t size )
+mmu_allocateTask( uint32_t pid )
 {
-	// TODO: implement
+	mmu_mapRegion( &_taskRegionTemplate, pid );
+
+	return 0;
+}
+
+uint32_t
+mmu_map_memory( uint32_t pid, uint32_t addr, uint8_t* mem, uint32_t memSize )
+{
+	_memMapRegionTemplate.numPages = ( memSize / ( _memMapRegionTemplate.pageSize * 1024 ) );
+	_memMapRegionTemplate.vAddress = addr;
+	_memMapRegionTemplate.physicalStartAdress = addr;
+
+	if ( memSize % ( _memMapRegionTemplate.pageSize * 1024 ) )
+	{
+		_memMapRegionTemplate.numPages++;
+	}
+
+	mmu_mapRegion( &_memMapRegionTemplate, pid );
+
+	uint8_t* pAddr = ( uint8_t* ) addr;
+
+	memcpy( pAddr, mem, memSize );
+
 	return 0;
 }
 
@@ -113,10 +244,6 @@ void mmu_mapRegion(Region* reg, uint32_t processID) {
 	default:
 		break;
 	}
-
-}
-
-void addProcess() {
 
 }
 
@@ -195,14 +322,13 @@ void mmu_mapSectionTableRegion(Region* reg, uint32_t processID) {
 
 	uint32_t i;
 
-
 	if(reg->mappingType == Fixed) {
 		tempPAdress = reg->physicalStartAdress;
 	} else {
 		tempPAdress = (uint32_t)getFree1MPage(processID);
 	}
 
-	for(i = 0; i < reg->numPages; i++) {					// iterate through all pages
+	for(i = 0; i < reg->numPages; ++i) {					// iterate through all pages
 
 		uint32_t index = (tempVAdress >> 20) & 0x00000FFF;	// get base of virtual address [20:31]
 

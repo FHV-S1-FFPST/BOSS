@@ -9,7 +9,7 @@
 
 #include "../fs/fat32/fat32.h"
 #include "../scheduler/scheduler.h"
-#include "../page_manager/pageManager.h"
+#include "../mmu/mmu.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -143,7 +143,7 @@ loadTaskFromFile( const char* fileName )
 		goto closeAndExit;
 	}
 
-	task = createTask( ( uint32_t* ) elfHeader->e_entry, fileSize );
+	task = createTask( ( uint32_t* ) elfHeader->e_entry );
 	if ( 0 == task )
 	{
 		ret = 1;
@@ -159,7 +159,7 @@ loadTaskFromFile( const char* fileName )
 			continue;
 		}
 
-		memcpy( ( uint32_t* ) programHeader->p_vaddr, &fileBuffer[ programHeader->p_offset ], programHeader->p_memsz );
+		mmu_map_memory( task->pid, programHeader->p_vaddr, &fileBuffer[ programHeader->p_offset ], programHeader->p_memsz );
 	}
 
 	ret = 0;

@@ -12,7 +12,7 @@
 
 uint32_t schedInit( void );
 int32_t getCurrentPid( void );
-Task* createTask( uint32_t* entryPoint, uint32_t size );
+Task* createTask( uint32_t* entryPoint );
 void schedStart( void );
 
 #endif /* SCHEDULER_H_ */

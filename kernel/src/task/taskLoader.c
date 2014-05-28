@@ -23,9 +23,6 @@
 #define PF_W 					0x2
 #define PF_R 					0x4
 
-#define PF_TEXT_SEGMENT 		PF_X | PF_R
-#define PF_DATA_SEGMENT 		PF_X | PF_W | PF_R
-
 ///////////////////////////////////////////////////////////////
 
 // module-local structures
@@ -152,17 +149,9 @@ loadTaskFromFile( const char* fileName )
 			continue;
 		}
 
-		if ( PF_TEXT_SEGMENT == programHeader->p_flags )
+		if ( programHeader->p_flags | PF_X )
 		{
-			programHeader->p_type = 0;
-		}
-		else if ( PF_DATA_SEGMENT == programHeader->p_flags )
-		{
-			programHeader->p_type = 0;
-		}
-		else
-		{
-			// ignore
+
 		}
 	}
 

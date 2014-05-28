@@ -1,15 +1,24 @@
 #include "hdmi_driver.h"
 
-#define HDMI_MSG_WRITE 0
+#include <stdlib.h>
+
+#define HDMI_MSG_WRITE 		0
+
+static MESSAGE msg;
 
 int
 main( void )
 {
 	openHDMI();
 	
-	MESSAGE msg;
+	if ( channelOpen( HDMI_CHANNEL ) )
+	{
+		return 1;
+	}
 
-	while ( 0 == receive( HDMI_CHANNEL, &msg ) )
+	msg.data = malloc( MESSAGE_MAX_DATA_SIZE );
+
+	while ( 0 == receive( HDMI_CHANNEL, &msg, 0 ) )
 	{
 		if ( HDMI_MSG_WRITE == msg.id )
 		{

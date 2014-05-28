@@ -1,17 +1,26 @@
 #include "serial_driver.h"
 
-#define SERIAL_MSG_WRITE 0
-#define SERIAL_MSG_READ 1
-#define SERIAL_MSG_BAUD 2
+#include <stdlib.h>
+
+#define SERIAL_MSG_WRITE 	0
+#define SERIAL_MSG_READ 	1
+#define SERIAL_MSG_BAUD 	2
+
+static MESSAGE msg;
 
 int
 main( void )
 {
 	initSerial();
 
-	MESSAGE msg;
+	if ( channelOpen( SERIAL_CHANNEL ) )
+	{
+		return 1;
+	}
 
-	while ( 0 == receive( SERIAL_CHANNEL, &msg ) )
+	msg.data = malloc( MESSAGE_MAX_DATA_SIZE );
+
+	while ( 0 == receive( SERIAL_CHANNEL, &msg, 0 ) )
 	{
 		if ( SERIAL_MSG_WRITE == msg.id )
 		{
@@ -19,7 +28,14 @@ main( void )
 		}
 		else if ( SERIAL_MSG_READ == msg.id )
 		{
-			// TODO: howto response?
+			uint32_t tmp = msg.receiver;
+			msg.receiver = msg.sender;
+			msg.sender = tmp;
+
+			msg.dataSize = 1;
+			msg.data[ 0 ] = 'X';
+
+			send( SERIAL_CHANNEL, &msg );
 		}
 		else if ( SERIAL_MSG_BAUD == msg.id )
 		{

@@ -26,7 +26,6 @@ SECTIONS
 	.cinit      > ext_ddr_os
 	.cio        > ext_ddr_os
 
-	// TODO: add .heap section with meaningful value
 	.heap		> ext_ddr_rest
 
 	.text       > ext_ddr_os
@@ -38,11 +37,9 @@ SECTIONS
 	.abortstack	> ext_ddr_os
 	// stack-address for supervisor-mode
 	.svcstack	> ext_ddr_os
-	// TODO: add here further stack-addresses and initialize them in boot.asm as required
-
 
 	// map interrupt-vectors to 0x40200000 instead of 0x4020FFC8 (OMAP35x.pdf at page 3438) because would not
 	// fit to memory (overshoot length). so in boot.asm the c12 register is set to 0x40200000
-	.intvecs    > ext_ddr_os
+	.intvecs    > int_ram
 
 }

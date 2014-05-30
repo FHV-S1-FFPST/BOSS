@@ -8,21 +8,23 @@
 #ifndef MMU_H_
 #define MMU_H_
 
-#include <stdlib.h>
-#include <inttypes.h>
-#include <string.h>
-#include "../page_manager/pageManager.h"
+#include "../task/task.h"
 
 uint32_t mmu_init( void );
 
 /**
  * allocates a L1 entry for a given pid
  */
-uint32_t mmu_allocateTask( uint32_t pid );
+uint32_t* mmu_allocate_task();
 /**
  * maps the memory at mem with size of memSize to the address given at addr into
  * the space of task with pid by creating a new L2 region with the necessary number of pages.
  */
-uint32_t mmu_map_memory( uint32_t pid, uint32_t addr, uint8_t* mem, uint32_t memSize );
+uint32_t mmu_map_memory( Task* task, uint32_t addr, uint8_t* mem, uint32_t memSize );
+
+void mmu_ttbSet(uint32_t ttbAddr);
+void mmu_tlbFlush(void);
+void mmu_setProcessID(uint8_t pid);
+void mmu_domainAccessSet(uint32_t value, uint32_t mask);
 
 #endif /* MMU_H_ */

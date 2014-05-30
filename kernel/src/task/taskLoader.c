@@ -159,7 +159,7 @@ loadTaskFromFile( const char* fileName )
 			continue;
 		}
 
-		mmu_map_memory( task->pid, programHeader->p_vaddr, &fileBuffer[ programHeader->p_offset ], programHeader->p_memsz );
+		mmu_map_memory( task, programHeader->p_vaddr, &fileBuffer[ programHeader->p_offset ], programHeader->p_memsz );
 	}
 
 	ret = 0;

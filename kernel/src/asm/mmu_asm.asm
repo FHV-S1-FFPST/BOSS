@@ -14,7 +14,7 @@ _tlb_flush:
 	MOV PC, LR
 
 _pid_set:
-	MCR p15, #0, r0, c13, c0, #0
+	MCR p15, #0, r0, c13, c0, #1
 	MOV PC, LR
 
 _mmu_setDomainAccess:

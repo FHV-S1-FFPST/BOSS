@@ -10,7 +10,6 @@
 Pagestatus stati[PAGE_COUNT];	// yes yes i know, stati is not the correct plural, but fuck that shit
 
 uint8_t initPageManager(void) {
-	volatile int size = sizeof(Pagestatus);
 	memset(stati, 0, PAGE_COUNT * sizeof(Pagestatus));
 
 	return 0;

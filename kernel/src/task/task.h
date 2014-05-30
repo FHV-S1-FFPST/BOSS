@@ -8,7 +8,7 @@
 #ifndef TASK_H_
 #define TASK_H_
 
-#include <boss.h>
+#include "../common/common.h"
 
 typedef enum {
 	INVALID = 0,
@@ -21,7 +21,7 @@ typedef enum {
 
 typedef struct {
 	// process identification
-	uint32_t pid;
+	uint8_t pid;
 
 	uint32_t* initPC;
 
@@ -35,6 +35,8 @@ typedef struct {
 
 	// time to wait for message
 	uint32_t waitUntil;
+
+	uint32_t* pageTable;
 } Task;
 
 #endif /* TASK_H_ */

@@ -10,11 +10,11 @@
 
 #include "task.h"
 
-#define MAX_TASKS 32
+#define MAX_TASKS 255
 
-Task* getTask( uint32_t pid );
+Task* getTask( uint8_t pid );
 int32_t addTask( Task* task );
-int32_t getNextFreePID();
-int32_t getNumOfTasks();
+uint8_t getNextFreePID();
+uint8_t getNumOfTasks();
 
 #endif /* TASKTABLE_H_ */

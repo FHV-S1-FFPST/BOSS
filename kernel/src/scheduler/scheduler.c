@@ -112,9 +112,9 @@ createTask( uint32_t* entryPoint )
 
 	allocateStackPointer( &newTask );
 
-	addTask( &newTask );
+	newTask.pageTable = mmu_allocate_task( newTask.pid );
 
-	mmu_allocateTask( newTask.pid );
+	addTask( &newTask );
 
 	return getTask( newTask.pid );
 }
@@ -213,6 +213,9 @@ scheduleNextReady( UserContext* ctx )
 	}
 
 	restoreCtxFromTask( ctx, task );
+
+	mmu_ttbSet( ( int32_t ) task->pageTable );
+	mmu_setProcessID( task->pid );
 
 	runningPID = task->pid;
 
@@ -327,6 +330,8 @@ initializeTask( Task* task, uint32_t* entryPoint )
 	task->pid = getNextFreePID();
 	task->initPC = entryPoint;
 	task->cpsr = USERMODE_WITHIRQ_CPSR;
+	task->pageTable = 0;
+	task->waitUntil = 0;
 }
 
 int32_t

@@ -18,8 +18,6 @@
 #include <boss.h>
 
 #pragma INTERRUPT ( undefInstrHandler, UDEF );
-#pragma INTERRUPT ( prefetchAbortHandler, PABT );
-#pragma INTERRUPT ( dataAbortHandler, DABT );
 
 #define SYSTIMER_OVERFLOW_INTERVAL_MS 0xFFFFFF
 
@@ -119,14 +117,20 @@ swiHandler( uint32_t swiId, UserContext* ctx )
 	return ret;
 }
 
-interrupt
-void prefetchAbortHandler()
+uint32_t
+dataAbortHandler( uint32_t faultStatusReg, uint32_t faultAddress )
 {
-	// implement when necessary
+	uint32_t faultStatus = faultStatusReg & 0xF;
+	uint32_t domain = ( faultStatusReg >> 4 ) & 0xF;
+
+	// TODO: ABORT-STACK seems to be not present in linkage, fix it
+
+	// NOTE: return 0 when no repeating of last instruction is needed,  otherwise return 1
+	return 0;
 }
 
-interrupt
-void dataAbortHandler()
+void
+prefetchAbortHandler()
 {
 	// implement when necessary
 }

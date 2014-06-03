@@ -175,7 +175,7 @@ Region _memMapRegionTemplate =
 	.numPages = 0,
 	.vAddress = 0,
 	.physicalStartAdress = 0,
-	.AP = ReadWriteNoAccess,
+	.AP = ReadWriteTwiceBitch,
 	.CB = WriteBack,
 	.ptType = COARSE,
 	.mappingType = Dynamic,
@@ -389,4 +389,3 @@ void mmu_setProcessID(uint8_t pid) {
 
 	_pid_set( val );
 }
-

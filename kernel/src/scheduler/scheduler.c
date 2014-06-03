@@ -119,6 +119,7 @@ createTask( uint32_t* entryPoint )
 	return getTask( newTask.pid );
 }
 
+/*
 int32_t
 fork()
 {
@@ -136,7 +137,9 @@ fork()
 
 	return 0;
 }
+*/
 
+/*
 int32_t
 sleep( uint32_t millis )
 {
@@ -154,6 +157,7 @@ sleep( uint32_t millis )
 
 	return 0;
 }
+*/
 
 // NOTE: this is a callback called by irq
 uint32_t

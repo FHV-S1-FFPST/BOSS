@@ -7,6 +7,7 @@
 
 #include "mmu.h"
 
+#include "../common/common.h"
 #include <string.h>
 #include "../page_manager/pageManager.h"
 

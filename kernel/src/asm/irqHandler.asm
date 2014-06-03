@@ -17,9 +17,6 @@ _irq_handler_asm:
 	; irqHandler( UserContext* ctx )
 	BL		irqHandler					; branch AND link to irq parent handler
 
-	; TODO: do a BEQ on R0:
-	; if R0 == 1 then scheduling was performed
-
 	LDMFD	SP!, { R1 }					; restore SPSR, if changed by scheduler
 	MSR		SPSR_cxsf, R1				; set stored cpsr from user to the current CPSR - will be restored later during SUBS
 

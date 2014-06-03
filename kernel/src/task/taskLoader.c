@@ -159,6 +159,8 @@ loadTaskFromFile( const char* fileName )
 			continue;
 		}
 
+		// TODO: p_vaddr has to be a multiple of page-size otherwise it could be that it will be mapped to the same address
+
 		mmu_map_memory( task, programHeader->p_vaddr, &fileBuffer[ programHeader->p_offset ], programHeader->p_memsz );
 	}
 

@@ -32,9 +32,9 @@
 #define SYSC_SENDRCV			13
 
 // TASK-MANAGEMENT CALLS
-#define SYSC_CREATETASK			14
-#define SYSC_FORK				15
-#define SYSC_SLEEP				16
+//#define SYSC_CREATETASK			14
+//#define SYSC_FORK				15
+//#define SYSC_SLEEP				16
 
 // MISC CALLS
 #define SYSC_SYSMILLIS			17
@@ -54,8 +54,8 @@
 
 	// TASK-MANAGEMENT CALLS
 	//#pragma SWI_ALIAS( createTask, SYSC_CREATETASK );
-	#pragma SWI_ALIAS( fork, SYSC_FORK );
-	#pragma SWI_ALIAS( sleep, SYSC_SLEEP );
+	//#pragma SWI_ALIAS( fork, SYSC_FORK );
+	//#pragma SWI_ALIAS( sleep, SYSC_SLEEP );
 
 	// MISC CALLS
 	#pragma SWI_ALIAS( getSysMillis, SYSC_SYSMILLIS );
@@ -109,9 +109,11 @@ int32_t send( uint32_t channelId, MESSAGE* msg );
 
 /**
  * Receives a message from a given channel waiting timeout milliseconds for a message to arrive.
- * If timeout is > 0 it will block at least timeout ms until a message arrives. if no message was received msg is set to 0.
+ * If timeout is > 0 it will block at least timeout ms until a message arrives.
  * If timeout is 0, it will block forever.
  * If timeout is -1, it will return immediately if no message is present and will have msg set to 0.
+ *
+ * returns 0 if message a was received
  */
 int32_t receive( uint32_t channelId, MESSAGE* msg, int32_t timeout );
 
@@ -130,14 +132,16 @@ int32_t sendrcv( uint32_t channelId, MESSAGE* msg, uint32_t timeout );
 
 /**
  * Forks the task. Will return 0 for the child-task and > 0 for the parent-task.
+ *
+ * int32_t fork();
  */
-int32_t fork();
 
 /**
  * Suspends the task for at least the given milliseconds.
  * TODO: replace by a receive on the null-channel with a given timeout of millis
+ *
+ * int32_t sleep( uint32_t millis );
  */
-int32_t sleep( uint32_t millis );
 
 /**
  * Returns the milliseconds since the system was started.

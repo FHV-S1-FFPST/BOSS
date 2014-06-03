@@ -10,6 +10,24 @@
 int
 main( void )
 {
+	while( 1 )
+	{
+		uint64_t startMillis = getSysMillis();
+
+		// wait for a message on NULL-CHANNEL for 1000ms -> will timeout, nullchannel is not existing
+		receive( NULL_CHANNEL, 0, 1000 );
+
+		uint64_t stopMillis = getSysMillis();
+		uint64_t deltaMillis = stopMillis - startMillis;
+
+		deltaMillis++;
+	}
+}
+
+/*
+int
+main( void )
+{
 	if ( fork() )
 	{
 		// NOTE: at this point we are in the parent of fork
@@ -43,3 +61,4 @@ main( void )
 		}
 	}
 }
+*/

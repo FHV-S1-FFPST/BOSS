@@ -87,6 +87,7 @@ swiHandler( uint32_t swiId, UserContext* ctx )
 	{
 		ret = channelAttach( ctx->regs[ 0 ] );
 	}
+	/*
 	else if ( SYSC_CREATETASK == swiId )
 	{
 		//task_func entryPoint = ( task_func ) ctx->regs[ 0 ];
@@ -101,6 +102,7 @@ swiHandler( uint32_t swiId, UserContext* ctx )
 	{
 		ret = sleep( ctx->regs[ 0 ] );
 	}
+	*/
 	else if ( SYSC_SYSMILLIS == swiId )
 	{
 		ret = getSysMillisSysCall();

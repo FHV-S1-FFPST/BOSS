@@ -8,7 +8,9 @@
 #ifndef TASK_H_
 #define TASK_H_
 
-#include "../common/common.h"
+#include <boss.h>
+
+#define MSG_QUEUE_SIZE 16
 
 typedef enum {
 	INVALID = 0,
@@ -37,6 +39,8 @@ typedef struct {
 	uint32_t waitUntil;
 
 	uint32_t* pageTable;
+
+	MESSAGE	msgQueue[ MSG_QUEUE_SIZE ];
 } Task;
 
 #endif /* TASK_H_ */

@@ -1,3 +1,5 @@
+#include <stdio.h>
+
 #include "core/core.h"
 #include "scheduler/scheduler.h"
 #include "irq/irq.h"

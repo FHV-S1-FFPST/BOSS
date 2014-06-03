@@ -8,7 +8,8 @@
 #ifndef SDRC_H_
 #define SDRC_H_
 
+#include <inttypes.h>
 
-
+uint8_t initSDRam(void);
 
 #endif /* SDRC_H_ */

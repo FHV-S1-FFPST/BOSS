@@ -7,6 +7,7 @@
 #include "mmu/mmu.h"
 #include "task/taskLoader.h"
 #include "page_manager/pageManager.h"
+#include "sdrc/sdrc.h"
 
 /**
  * Prototypes
@@ -57,6 +58,10 @@ main( void )
 int32_t
 initHardware( void )
 {
+	if ( initSDRam( ) ) {
+		return 1;
+	}
+
 	if ( initPageManager( ) )
 	{
 		return 1;

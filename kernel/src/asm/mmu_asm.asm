@@ -14,7 +14,7 @@ _tlb_flush:
 	MOV PC, LR
 
 _pid_set:
-	MCR p15, #0, r0, c13, c0, #1
+	MCR p15, #0, r0, c13, c0, #0
 	MOV PC, LR
 
 _mmu_setDomainAccess:
@@ -30,7 +30,7 @@ _mmu_init:
   	BIC r1, r1, #(0x1 << 2)      ; Enable Data cache
   	MCR p15, #0, r1, c1, c0, #0
   	mcr p15, #0, r1, c8, c7, #0    ; Invalidate TLB
-  	mov r0, #0x5555
+  	mov r0, #0xFFFF
   	mcr p15, #0, r0, c3, c0, #0    ; Set DACR to all "manager" - no permissions checking
 
   	mov r0, #0

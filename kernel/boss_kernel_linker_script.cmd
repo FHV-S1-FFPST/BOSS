@@ -12,7 +12,7 @@ MEMORY
 	int_ram:		ORIGIN = 0x40200000		LENGTH = 0x0000FFFF
 	ext_ddr_pt:		ORIGIN = 0x80000000		LENGTH = 0x00500000
 	ext_ddr_os:		ORIGIN = 0x80500000		LENGTH = 0x02000000
-	ext_ddr_rest: 	ORIGIN = 0x82500000		LENGTH = 0x3DB00000
+	ext_ddr_rest: 	ORIGIN = 0x82500000		LENGTH = 0x0DB00000
 }
 
 SECTIONS
@@ -26,7 +26,7 @@ SECTIONS
 	.cinit      > ext_ddr_os
 	.cio        > ext_ddr_os
 
-	.heap		> ext_ddr_rest
+	.heap		> ext_ddr_os
 
 	.text       > ext_ddr_os
 	.sysmem     > ext_ddr_os

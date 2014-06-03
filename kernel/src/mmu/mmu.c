@@ -336,7 +336,12 @@ void mmu_mapCoarseTableRegion(Region* reg, uint8_t pid) {
 				PTE = regPAdressTemp & 0xFFFFF000;
 				regPAdressTemp += 0x1000;
 			} else {
-				PTE = ((uint32_t)getFree4KPage(pid)) & 0xFFFFF000;
+
+				if((((uint32_t *)tempL2Adress)[l2Index] & 0x00000003) == 0x2) {
+					continue;
+				} else {
+					PTE = ((uint32_t)getFree4KPage(pid)) & 0xFFFFF000;
+				}
 			}
 
 			PTE |= reg->AP << 10;

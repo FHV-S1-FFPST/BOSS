@@ -73,8 +73,8 @@ typedef struct
 {
 	uint32_t id;
 
-	uint32_t receiver;
-	uint32_t sender;
+	uint8_t receiver;
+	uint8_t sender;
 
 	uint8_t* data;
 	uint8_t dataSize;

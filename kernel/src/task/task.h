@@ -17,9 +17,20 @@ typedef enum {
 	READY,
 	RUNNING,
 	BLOCKED,
-	SLEEPING,
-	WAITING_MSG
+	WAITING
 } TaskState;
+
+typedef struct
+{
+	uint32_t channel;
+
+	uint32_t id;
+
+	uint8_t sender;
+
+	uint8_t data[ MESSAGE_MAX_DATA_SIZE ];
+	uint8_t dataSize;
+} IPC_MESSAGE;
 
 typedef struct {
 	// process identification
@@ -35,12 +46,17 @@ typedef struct {
 	// process control information
 	TaskState state;
 
-	// time to wait for message
+	// time to wait for message ...
 	uint32_t waitUntil;
+	// ... with given id ...
+	uint32_t waitMsgId;
+	// ... from channel with id
+	uint32_t waitChannel;
 
+	// address of page-table of this task
 	uint32_t* pageTable;
 
-	MESSAGE	msgQueue[ MSG_QUEUE_SIZE ];
+	IPC_MESSAGE* msgQueue[ MSG_QUEUE_SIZE ];
 } Task;
 
 #endif /* TASK_H_ */

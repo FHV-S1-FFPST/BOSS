@@ -12,6 +12,8 @@ channelOpen( uint32_t channelId )
 {
 	// TODO: implement
 
+
+
 	return 0;
 }
 

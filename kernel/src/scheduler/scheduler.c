@@ -276,12 +276,44 @@ getNextReady()
 			}
 		}
 
-		// task is sleeping, check if sleep until timelimit has hit
-		if ( SLEEPING == task->state )
+		// task is waiting for a message
+		if ( WAITING == task->state )
 		{
-			if ( task->waitUntil <= currentMillis )
+			uint32_t j = 0;
+
+			// check if message has already arrived
+			for ( j = 0; j < MSG_QUEUE_SIZE; ++j )
+			{
+				IPC_MESSAGE* msg = task->msgQueue[ j ];
+
+				// a message exists in queue
+				if ( msg )
+				{
+					// check if its the message the task is waiting for
+					if ( ( msg->channel == task->waitChannel ) &&
+							( msg->id == task->waitMsgId ))
+					{
+						// yes it is
+						// TODO: make task ready
+						// TODO: copy message to user-space
+						// TODO: update according register
+						// TODO: set return-register
+
+						// TODO: cleanup IPC_MESSAGE* msg entry j
+
+						break;
+					}
+				}
+			}
+
+			// a timeout is specified, check if it is hit
+			if ( ( task->waitUntil ) && ( task->waitUntil <= currentMillis ) )
 			{
 				task->state = READY;
+
+				// TODO: make task ready
+				// TODO: set return-register
+
 				return task;
 			}
 		}
@@ -334,8 +366,6 @@ initializeTask( Task* task, uint32_t* entryPoint )
 	task->pid = getNextFreePID();
 	task->initPC = entryPoint;
 	task->cpsr = USERMODE_WITHIRQ_CPSR;
-	task->pageTable = 0;
-	task->waitUntil = 0;
 }
 
 int32_t

@@ -158,13 +158,13 @@ Region _pageTableRegion =
 Region _sramRegion =
 {
 	.parentAddress = ( uint32_t* ) MASTER_PT_ADDR,
-	.pageSize = 4,
-	.numPages = 16,
+	.pageSize = 1024,
+	.numPages = 1,
 	.vAddress = SRAM_REGION_VADDR,
 	.physicalStartAdress = SRAM_REGION_VADDR,
 	.AP = ReadWriteNoAccess,
 	.CB = WriteBack,
-	.ptType = COARSE,
+	.ptType = MASTER,
 	.mappingType = Fixed,
 	.local = FALSE
 };

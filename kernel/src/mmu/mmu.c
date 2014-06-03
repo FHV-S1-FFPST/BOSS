@@ -295,25 +295,31 @@ void mmu_mapCoarseTableRegion(Region* reg, uint8_t pid) {
 	uint32_t pagesToWrite = 0;
 
 	for(i = 0; i < numPageTables; i++) {
-		Pagetable tempTable;
-		tempTable.ptAddress = (uint32_t) nextFreePT;
-		tempTable.ptAddressPhysical = tempTable.ptAddress;
-		tempTable.type = COARSE;
-		tempTable.domain = 3;
 
-		mmu_initPagetable(&tempTable);
-
-		// write entry in l1 table that points to l2 table
 		uint32_t indexInL1 = (regVAdressTemp >> 20) & 0x00000FFF;
+		Pagetable tempTable;
+		uint32_t tempL2Adress;
 
-		PTE = 0;
-		PTE = (tempTable.ptAddress & 0xFFFFFC00);
-		PTE |= tempTable.domain << 5;
-		PTE |= reg->local << 17; // if local -> TLB will use processid -> no need to flush TLB
-		PTE |= 0x1;
+		if((masterPT[indexInL1] & 0x00000003) == 0x2) {
+			tempL2Adress = masterPT[indexInL1] & 0xFFFFFC00;
+		} else {
+			Pagetable tempTable;
+			tempTable.ptAddress = (uint32_t) nextFreePT;
+			tempTable.ptAddressPhysical = tempTable.ptAddress;
+			tempTable.type = COARSE;
+			tempTable.domain = 3;
+			mmu_initPagetable(&tempTable);
+			tempL2Adress = tempTable.ptAddress;
 
-		masterPT[indexInL1] = PTE;
-		nextFreePT += PAGETABLE_SIZE; // TODO: fix it. need only 0x400 but add 16k to be aligned to 16k;
+			PTE = 0;
+			PTE = (tempTable.ptAddress & 0xFFFFFC00);
+			PTE |= tempTable.domain << 5;
+			PTE |= reg->local << 17; // if local -> TLB will use processid -> no need to flush TLB
+			PTE |= 0x2;
+
+			masterPT[indexInL1] = PTE;
+			nextFreePT += PAGETABLE_SIZE; // TODO: fix it. need only 0x400 but add 16k to be aligned to 16k;
+		}
 
 		if(numPageTables == i + 1) {
 			pagesToWrite = reg->numPages % 256;
@@ -324,6 +330,7 @@ void mmu_mapCoarseTableRegion(Region* reg, uint8_t pid) {
 		// write l2 table
 		for(j = 0; j < pagesToWrite; j++) {
 			PTE = 0;
+			uint32_t l2Index = (regVAdressTemp & 0x000FF000) >> 12;
 
 			if(reg->mappingType == Fixed) {
 				PTE = regPAdressTemp & 0xFFFFF000;
@@ -339,11 +346,12 @@ void mmu_mapCoarseTableRegion(Region* reg, uint8_t pid) {
 			PTE |= reg->CB << 2;
 			PTE |= 0x2;
 
-			((uint32_t *)tempTable.ptAddress)[j] = PTE;
+			((uint32_t *)tempL2Adress)[l2Index] = PTE;
+			regVAdressTemp += 0x1000;
 
 		}
 
-		regVAdressTemp += 0x100000;
+
 	}
 }
 

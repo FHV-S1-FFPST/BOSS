@@ -66,7 +66,7 @@ SWI -> IRQ
 #define USERMODE_WITHIRQ_CPSR		0x60000110
 
 // module-local data //////////////////////////////////////////////
-static uint32_t runningPID = 0;
+static uint8_t runningPID = 0;
 // module-local functions /////////////////////////////////////////
 static uint32_t schedule( UserContext* ctx );
 static uint32_t scheduleNextReady( UserContext* ctx );
@@ -97,7 +97,7 @@ schedStart()
 	irqTimerStart();
 }
 
-int32_t
+uint8_t
 getCurrentPid( void )
 {
 	return runningPID;
@@ -279,39 +279,11 @@ getNextReady()
 		// task is waiting for a message
 		if ( WAITING == task->state )
 		{
-			uint32_t j = 0;
-
-			// check if message has already arrived
-			for ( j = 0; j < MSG_QUEUE_SIZE; ++j )
-			{
-				IPC_MESSAGE* msg = task->msgQueue[ j ];
-
-				// a message exists in queue
-				if ( msg )
-				{
-					// check if its the message the task is waiting for
-					if ( ( msg->channel == task->waitChannel ) &&
-							( msg->id == task->waitMsgId ))
-					{
-						// yes it is
-						// TODO: make task ready
-						// TODO: copy message to user-space
-						// TODO: update according register
-						// TODO: set return-register
-
-						// TODO: cleanup IPC_MESSAGE* msg entry j
-
-						break;
-					}
-				}
-			}
-
 			// a timeout is specified, check if it is hit
 			if ( ( task->waitUntil ) && ( task->waitUntil <= currentMillis ) )
 			{
 				task->state = READY;
 
-				// TODO: make task ready
 				// TODO: set return-register
 
 				return task;

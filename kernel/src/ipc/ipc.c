@@ -7,52 +7,53 @@
 
 #include "ipc.h"
 
+#include "channel.h"
+#include "../task/tasktable.h"
+#include "../scheduler/scheduler.h"
+
 int32_t
 channelOpen( uint32_t channelId )
 {
-	// TODO: implement
-
-
-
-	return 0;
+	return channel_open( channelId );
 }
 
 int32_t
 channelClose( uint32_t channelId )
 {
-	// TODO: implement
-
-	return 0;
+	return channel_close( channelId );
 }
 
 int32_t
 channelAttach( uint32_t channelId )
 {
-	// TODO: implement
+	Task* t = getTask( getCurrentPid() );
 
-	return 0;
+	return channel_attach( channelId, t );
 }
 
 int32_t
 send( uint32_t channelId, MESSAGE* msg )
 {
-	// TODO: implement
-
-	return 0;
+	return channel_receivesMessage( channelId, msg );
 }
 
 int32_t
 receive( uint32_t channelId, MESSAGE* msg, int32_t timeout )
 {
-	// TODO: implement
+	Task* t = getTask( getCurrentPid() );
 
-	return 0;
+	return channel_waitForMessage( channelId, t, timeout );
 }
 
 int32_t
-sendrcv( uint32_t channelId, MESSAGE* sendMsg, uint32_t timeout )
+sendrcv( uint32_t channelId, MESSAGE* msg, uint32_t timeout )
 {
-	// TODO: implement
+	Task* t = getTask( getCurrentPid() );
 
-	return 0;
+	if ( channel_receivesMessage( channelId, msg ) )
+	{
+		return 1;
+	}
+
+	return channel_waitForMessage( channelId, t, timeout );
 }

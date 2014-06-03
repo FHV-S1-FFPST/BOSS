@@ -11,7 +11,7 @@
 #include "../task/task.h"
 
 uint32_t schedInit( void );
-int32_t getCurrentPid( void );
+uint8_t getCurrentPid( void );
 Task* createTask( uint32_t* entryPoint );
 void schedStart( void );
 

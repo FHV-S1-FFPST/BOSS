@@ -18,8 +18,6 @@ main( void )
 		return 1;
 	}
 
-	msg.data = malloc( MESSAGE_MAX_DATA_SIZE );
-
 	while ( 0 == receive( SERIAL_CHANNEL, &msg, 0 ) )
 	{
 		if ( SERIAL_MSG_WRITE == msg.id )

@@ -21,8 +21,6 @@ main( void )
 		return 1;
 	}
 
-	msg.data = malloc( MESSAGE_MAX_DATA_SIZE );
-
 	printText( "Hello Johnny!\n" );
 	printText( "You are again the latest!\n" );
 

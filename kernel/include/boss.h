@@ -76,7 +76,7 @@ typedef struct
 	uint8_t receiver;
 	uint8_t sender;
 
-	uint8_t* data;
+	uint8_t data[ MESSAGE_MAX_DATA_SIZE ];
 	uint8_t dataSize;
 } MESSAGE;
 

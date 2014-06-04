@@ -1,7 +1,7 @@
 	.global _irq_handler_asm
 	.global irqHandler
 
-;INTCPS_SIR_IRQ_ADDR .word 0x48200040
+	.sect "._irq_handler_asm"
 
 _irq_handler_asm:
 	STMFD	SP, { R0 - R14 }^			; store user-registers on stack

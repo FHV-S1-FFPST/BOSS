@@ -1,7 +1,9 @@
-	.global _dataAbortHandler
+	.global _data_abort_handler_asm
 	.global dataAbortHandler
 
-_dataAbortHandler:
+	.sect "._data_abort_handler_asm"
+
+_data_abort_handler_asm:
 	STMFD	SP!, { R0, R1, R14 }			; save registers on stack
 
 	MRC p15, #0, r0, c5, c0, #0			; fetch FSR into R0 as argument to dataAbortHandler

@@ -9,7 +9,8 @@
 
 MEMORY
 {
-	int_ram:		ORIGIN = 0x40200000		LENGTH = 0x0000FFFF
+	int_ram_vecs:	ORIGIN = 0x40200000		LENGTH = 0x00000100
+	int_ram_hndl:	ORIGIN = 0x40200100		LENGTH = 0x0000FEFF
 	ext_ddr_pt:		ORIGIN = 0x80000000		LENGTH = 0x00500000
 	ext_ddr_os:		ORIGIN = 0x80500000		LENGTH = 0x02000000
 	ext_ddr_rest: 	ORIGIN = 0x82500000		LENGTH = 0x3DB00000
@@ -17,7 +18,6 @@ MEMORY
 
 SECTIONS
 {
-
 	.const      > ext_ddr_os
 	.bss        > ext_ddr_os
 	.far        > ext_ddr_os
@@ -41,7 +41,10 @@ SECTIONS
 
 	// map interrupt-vectors to 0x40200000 instead of 0x4020FFC8 (OMAP35x.pdf at page 3438) because would not
 	// fit to memory (overshoot length). so in boot.asm the c12 register is set to 0x40200000
-	.intvecs    > int_ram
+	.intvecs    > int_ram_vecs
 
-
+	._data_abort_handler_asm 		> int_ram_hndl
+	._irq_handler_asm 				> int_ram_hndl
+	._prefetch_abort_handler_asm 	> int_ram_hndl
+	._swi_handler_asm				> int_ram_hndl
 }

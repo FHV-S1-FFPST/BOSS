@@ -1,6 +1,8 @@
 	.global _swi_handler_asm
 	.global swiHandler
 
+	.sect "._swi_handler_asm"
+
 _swi_handler_asm:
 	STMFD	SP, { R0 - R14 }^		; store user-registers on stack
 	SUB		SP, SP, #60				; decrement stack-pointer: 15 * 4 bytes = 60bytes (not possible with ^ in previous op)

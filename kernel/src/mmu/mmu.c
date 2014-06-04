@@ -281,7 +281,7 @@ void mmu_mapSectionTableRegion(Region* reg, uint8_t pid) {
 void mmu_mapCoarseTableRegion(Region* reg, uint8_t pid) {
 
 	uint32_t* masterPT = (uint32_t *) reg->parentAddress;
-	uint32_t numPageTables = (reg->numPages / 256) + 1;
+	uint32_t numPageTables = (reg->numPages / 256) + 3;
 	uint32_t i, j;
 
 	uint32_t regVAdressTemp = reg->vAddress;
@@ -289,8 +289,13 @@ void mmu_mapCoarseTableRegion(Region* reg, uint8_t pid) {
 
 	uint32_t PTE = 0;
 	uint32_t pagesToWrite = 0;
+	uint32_t pagesWritenTotal = 0;
 
 	for(i = 0; i < numPageTables; i++) {
+
+		if(pagesWritenTotal == reg->numPages) {
+			break;
+		}
 
 		uint32_t indexInL1 = (regVAdressTemp >> 20) & 0x00000FFF;
 		Pagetable tempTable;
@@ -317,10 +322,10 @@ void mmu_mapCoarseTableRegion(Region* reg, uint8_t pid) {
 			nextFreePT += PAGETABLE_SIZE; // TODO: fix it. need only 0x400 but add 16k to be aligned to 16k;
 		}
 
-		if(numPageTables == i + 1) {
-			pagesToWrite = reg->numPages % 256;
-		} else {
+		if(reg->numPages - pagesWritenTotal > 256) {
 			pagesToWrite = 256;
+		} else {
+			pagesToWrite = reg->numPages - pagesWritenTotal;
 		}
 
 		// write l2 table
@@ -335,9 +340,11 @@ void mmu_mapCoarseTableRegion(Region* reg, uint8_t pid) {
 
 				if((((uint32_t *)tempL2Adress)[l2Index] & 0x00000003) == 0x2) {
 					regVAdressTemp += 0x1000;
+					++pagesWritenTotal;
 					continue;
 				} else {
 					PTE = ((uint32_t)getFree4KPage(pid)) & 0xFFFFF000;
+					++pagesWritenTotal;
 				}
 			}
 
@@ -357,8 +364,9 @@ void mmu_mapCoarseTableRegion(Region* reg, uint8_t pid) {
 
 		}
 
-
 	}
+
+	pagesWritenTotal++;
 }
 
 // initializes Pagetable with 0s

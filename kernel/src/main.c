@@ -104,11 +104,6 @@ initOs( void )
 		return 1;
 	}
 
-	if ( channel_open( NULL_CHANNEL ) )
-	{
-		return 1;
-	}
-
 	return 0;
 }
 

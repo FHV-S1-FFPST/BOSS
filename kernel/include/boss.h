@@ -67,14 +67,11 @@
 
 // SYSTEM-STRCUTURES
 
-#define MESSAGE_MAX_DATA_SIZE 1024
+#define MESSAGE_MAX_DATA_SIZE 256
 
 typedef struct
 {
 	uint32_t id;
-
-	uint8_t receiver; 	// TODO: remove
-	uint8_t sender;		// TODO: remove
 
 	uint8_t data[ MESSAGE_MAX_DATA_SIZE ];
 	uint8_t dataSize;

@@ -27,13 +27,12 @@
 #define NEXT_MSG_QUEUE_STARTPOS( channel ) ( ( channel->msgQueueStartPos + 1 ) & ( MESSAGE_QUEUE_LENGTH - 1 ) )
 #define IS_MSG_QUEUE_EMPTY( channel ) ( channel->msgQueueInsertPos == channel->msgQueueStartPos  )
 #define IS_MSG_QUEUE_FULL( channel ) ( ( ! IS_MSG_QUEUE_EMPTY( channel ) ) && ( NEXT_MSG_QUEUE_INSERTPOS( channel ) == channel->msgQueueStartPos ) )
-
 ////////////////////////////////////////////////////////
 
 // module-local data-structures
 typedef struct
 {
-	uint32_t id;
+	int32_t id;
 
 	int32_t subscribersStartPos;
 	int32_t subscribersInsertPos;
@@ -41,17 +40,17 @@ typedef struct
 
 	int32_t msgQueueStartPos;
 	int32_t msgQueueInsertPos;
-	MESSAGE* msgQueue[ MESSAGE_QUEUE_LENGTH ];
+	MESSAGE msgQueue[ MESSAGE_QUEUE_LENGTH ];
 } IPC_CHANNEL;
 ////////////////////////////////////////////////////////
 
 // module-local functions
 static IPC_CHANNEL* getChannelById( uint32_t channelId );
-static void copyMessageToTaskSpace( MESSAGE* msg, Task* t );
+static void copyMessageToTaskSpace( MESSAGE* msg );
 ////////////////////////////////////////////////////////
 
 // module-local data
-static IPC_CHANNEL* _channels[ MAX_CHANNELS ];
+static IPC_CHANNEL _channels[ MAX_CHANNELS ];
 ////////////////////////////////////////////////////////
 
 uint32_t
@@ -63,11 +62,7 @@ channel_open( uint32_t channelId )
 		return 1;
 	}
 
-	channel = malloc( sizeof( IPC_CHANNEL ) );
-	memset( channel, 0, sizeof( IPC_CHANNEL ) );
-	channel->id = channelId;
-
-	_channels[ channel->id ] = channel;
+	_channels[ channelId ].id = channelId;
 
 	return 0;
 }
@@ -75,26 +70,13 @@ channel_open( uint32_t channelId )
 uint32_t
 channel_close( uint32_t channelId )
 {
-	uint32_t i = 0;
-
 	IPC_CHANNEL* channel = getChannelById( channelId );
 	if ( 0 == channel )
 	{
 		return 1;
 	}
 
-	for ( i = 0; i < MESSAGE_QUEUE_LENGTH; ++i )
-	{
-		MESSAGE* msg = channel->msgQueue[ i ];
-		if ( msg )
-		{
-			free( msg );
-		}
-	}
-
-	free( channel );
-
-	_channels[ channelId ] = 0;
+	channel->id = NULL_CHANNEL;
 
 	return 0;
 }
@@ -135,7 +117,6 @@ channel_receivesMessage( uint32_t channelId, MESSAGE* msg )
 	for ( i = 0; i < MAX_SUBSCRIBERS; ++i )
 	{
 		Task* subscriber = channel->subscribers[ i ];
-
 		if ( subscriber )
 		{
 			// the subscriber is WAITING for a message from this channel => notify
@@ -145,7 +126,7 @@ channel_receivesMessage( uint32_t channelId, MESSAGE* msg )
 				subscriber->waitUntil = 0;
 				subscriber->state = READY;
 
-				copyMessageToTaskSpace( msg, subscriber );
+				copyMessageToTaskSpace( msg );
 				// receive will return 0 if message was received
 				subscriber->regs[ 0 ] = 0;
 
@@ -161,10 +142,9 @@ channel_receivesMessage( uint32_t channelId, MESSAGE* msg )
 			return 1;
 		}
 
-		MESSAGE* copyMsg = malloc( sizeof( MESSAGE ) );
+		MESSAGE* copyMsg = &channel->msgQueue[ channel->msgQueueInsertPos ];
 		memcpy( copyMsg, msg, sizeof( MESSAGE ) );
 
-		channel->msgQueue[ channel->msgQueueInsertPos ] = copyMsg;
 		channel->msgQueueInsertPos = NEXT_MSG_QUEUE_INSERTPOS( channel );
 	}
 
@@ -174,60 +154,101 @@ channel_receivesMessage( uint32_t channelId, MESSAGE* msg )
 uint32_t
 channel_waitForMessage( uint32_t channelId, Task* t, int32_t timeout )
 {
-	IPC_CHANNEL* channel = getChannelById( channelId );
-	if ( 0 == channel )
+	// NOTE: sleep is done using a receive with timeout on NULL-CHANNEL
+	// NULL-Channel is the invalid channel, it is not opened/closed/subscribed
+	// no send to it is possible but only a receive with a timeout
+	if ( NULL_CHANNEL == channelId )
 	{
-		return 1;
-	}
-
-	// negative timeout specified: only check for messages and if none present, return immediately
-	if ( 0 > timeout )
-	{
-		if ( IS_MSG_QUEUE_EMPTY( channel ) )
+		// no timeout specified, error, no wait, return immediately
+		if ( timeout <= 0 )
 		{
-			// receive returns -1 when no message received
-			// NOTE: use currentUserCtx because the call receive is from a currently running task
-			currentUserCtx->regs[ 0 ] = -1;
+			return 1;
 		}
-		else
-		{
-			MESSAGE* msg = channel->msgQueue[ channel->msgQueueStartPos ];
+	}
+	else
+	{
+		bool subscriberFound = FALSE;
 
-			copyMessageToTaskSpace( msg, t );
+		IPC_CHANNEL* channel = getChannelById( channelId );
+		if ( 0 == channel )
+		{
+			return 1;
+		}
+
+		// if a message is present, consume it
+		if ( ! IS_MSG_QUEUE_EMPTY( channel ) )
+		{
+			MESSAGE* msg = &channel->msgQueue[ channel->msgQueueStartPos ];
+
+			copyMessageToTaskSpace( msg );
 			// receive returns 0 when message received
 			// NOTE: use currentUserCtx because the call receive is from a currently running task
 			currentUserCtx->regs[ 0 ] = 0;
 
 			// clean-up message
-			free( msg );
-			channel->msgQueue[ channel->msgQueueStartPos ] = 0;
 			channel->msgQueueStartPos = NEXT_MSG_QUEUE_STARTPOS( channel );
+
+			return 0;
 		}
 
-		return 0;
+		// no message present at this point
+
+		// negative timeout specified: return immediately
+		if ( 0 > timeout )
+		{
+			// receive returns -1 when no message received
+			// NOTE: use currentUserCtx because the call receive is from a currently running task
+			currentUserCtx->regs[ 0 ] = -1;
+
+			return 0;
+		}
+
+		// timeout is >= 0: wait until message arrives or timeout hits
+
+		// need to check if this Task is in subscribers if blocking forever, if not it won't get notified ever if a message arrives
+		if ( 0 == timeout )
+		{
+			uint32_t i = 0;
+
+			// NOTE: this is a security check only, can be removed after debugging
+			for ( i = 0; i < MAX_SUBSCRIBERS; ++i )
+			{
+				Task* subscriber = channel->subscribers[ i ];
+				if ( subscriber == t )
+				{
+					subscriberFound = TRUE;
+					break;
+				}
+			}
+		}
+		else
+		{
+			subscriberFound = TRUE;
+		}
+
+		if ( FALSE == subscriberFound )
+		{
+			return 1;
+		}
 	}
 
-	// at this state receive is blocking: either with timeout or blocking forever
-
-	// TODO: need to check if this Task is in subscribers, if not it wont get notified ever if a message arrives
+	saveCurrentRunning( currentUserCtx );
 
 	t->state = WAITING;
 	t->waitUntil = ( 0 == timeout ) ? 0 : ( getSysMillis() + timeout );
-	t->waitChannel = channel->id;
+	t->waitChannel = channelId;
 
-	schedule( currentUserCtx );
+	scheduleNextReady( currentUserCtx );
 
 	return 0;
 }
 
 void
-copyMessageToTaskSpace( MESSAGE* msg, Task* t )
+copyMessageToTaskSpace( MESSAGE* msg )
 {
 	// receive has a pointer to the message to store as the 2nd parameter
-	MESSAGE* targetMsgPtr = currentUserCtx->regs[ 1 ];
-	targetMsgPtr->id = targetMsgPtr->id;
-
-	// TODO: implement, using currentUserCtx
+	MESSAGE* targetMsgPtr = ( MESSAGE* ) currentUserCtx->regs[ 1 ];
+	memcpy( targetMsgPtr, msg, sizeof( MESSAGE ) );
 }
 
 IPC_CHANNEL*
@@ -238,5 +259,10 @@ getChannelById( uint32_t channelId )
 		return 0;
 	}
 
-	return _channels[ channelId ];
+	if ( _channels[ channelId ].id == NULL_CHANNEL )
+	{
+		return 0;
+	}
+
+	return &_channels[ channelId ];
 }

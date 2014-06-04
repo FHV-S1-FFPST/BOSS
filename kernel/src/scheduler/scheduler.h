@@ -16,5 +16,7 @@ uint8_t getCurrentPid( void );
 Task* createTask( uint32_t* entryPoint );
 void schedStart( void );
 uint32_t schedule( UserContext* ctx );
+uint32_t saveCurrentRunning( UserContext* ctx );
+uint32_t scheduleNextReady( UserContext* ctx );
 
 #endif /* SCHEDULER_H_ */

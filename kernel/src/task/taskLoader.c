@@ -190,7 +190,7 @@ loadTaskFromFile( const char* fileName )
 		// check if there is some data left to be set to 0
 		if ( 0 < memDelta )
 		{
-			memset( &( ( uint32_t* ) programHeader->p_vaddr )[ programHeader->p_filesz ], 0, memDelta );
+//			memset( &( ( uint8_t* ) programHeader->p_vaddr )[ programHeader->p_filesz ], 0, memDelta );
 		}
 	}
 

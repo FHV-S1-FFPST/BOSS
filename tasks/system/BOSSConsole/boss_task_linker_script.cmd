@@ -17,4 +17,7 @@ SECTIONS
 
 	.heap		> v_ram
 	.stack      > v_ram
+
+	.bss		> v_ram
+	.sysmem		> v_ram
 }

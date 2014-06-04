@@ -11,12 +11,14 @@ static uint32_t getCh( char* c );
 int
 main( void )
 {
-	if ( channelAttach( SERIAL_CHANNEL ) )
+	/*
+	if ( channelSubscribe( SERIAL_CHANNEL ) )
 	{
 		return 1;
 	}
+	*/
 
-	if ( channelAttach( HDMI_CHANNEL ) )
+	if ( channelSubscribe( HDMI_CHANNEL ) )
 	{
 		return 1;
 	}
@@ -24,19 +26,16 @@ main( void )
 	printText( "Hello Johnny!\n" );
 	printText( "You are again the latest!\n" );
 
-	char c[] = { '\0', '\0' };
+	// char c[] = { '\0', '\0' };
 
 	while ( 1 )
 	{
-		if ( getCh( c ) )
+		if ( printText( "Hello Vorarlberg!" ) )
 		{
 			break;
 		}
 
-		if ( printText( c ) )
-		{
-			break;
-		}
+		receive( NULL_CHANNEL, 0, 5000 );
 	}
 
 	return 1;

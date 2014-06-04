@@ -8,9 +8,11 @@
 #include "pageManager.h"
 
 Pagestatus stati[PAGE_COUNT];	// yes yes i know, stati is not the correct plural, but fuck that shit
+uint32_t nextFreePageIndex;
 
 uint8_t initPageManager(void) {
 	memset(stati, 0, PAGE_COUNT * sizeof(Pagestatus));
+	nextFreePageIndex = 0;
 
 	return 0;
 }
@@ -21,7 +23,7 @@ uint32_t* getFreePageAbstract(uint32_t numPages, uint32_t processID) {
 		uint32_t startIndexToAllocate = 0;
 		uint32_t endIndexToAllocate = 0;
 
-		for(i = 0; i < PAGE_COUNT; ++i) {
+		for(i = nextFreePageIndex; i < PAGE_COUNT; ++i) {
 			if(stati[i].inUse == 0) {
 
 				if(freePagesInRow == 0) {
@@ -49,6 +51,7 @@ uint32_t* getFreePageAbstract(uint32_t numPages, uint32_t processID) {
 			}
 		}
 
+		nextFreePageIndex = startIndexToAllocate + numPages;
 		return (uint32_t *)(PAGE_START_ADDR + startIndexToAllocate * 4096);
 }
 

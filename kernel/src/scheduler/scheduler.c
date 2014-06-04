@@ -64,6 +64,7 @@ SWI -> IRQ
 
 #define SCHEDULE_INTERVAL_MS		10
 #define USERMODE_WITHIRQ_CPSR		0x60000110
+#define SUPERVISORMODE_WITHIRQ_CPSR	0x60000113
 
 // module-local data //////////////////////////////////////////////
 static uint8_t runningPID = 0;

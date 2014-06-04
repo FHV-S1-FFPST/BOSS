@@ -339,6 +339,7 @@ void mmu_mapCoarseTableRegion(Region* reg, uint8_t pid) {
 			} else {
 
 				if((((uint32_t *)tempL2Adress)[l2Index] & 0x00000003) == 0x2) {
+					regVAdressTemp += 0x1000;
 					continue;
 				} else {
 					PTE = ((uint32_t)getFree4KPage(pid)) & 0xFFFFF000;
@@ -354,6 +355,10 @@ void mmu_mapCoarseTableRegion(Region* reg, uint8_t pid) {
 
 			((uint32_t *)tempL2Adress)[l2Index] = PTE;
 			regVAdressTemp += 0x1000;
+
+			if(l2Index == 255) {
+				break;
+			}
 
 		}
 

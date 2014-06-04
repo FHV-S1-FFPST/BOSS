@@ -11,7 +11,7 @@ main( void )
 {
 	openHDMI();
 	
-	if ( channelOpen( HDMI_CHANNEL ) )
+	/*if ( channelOpen( HDMI_CHANNEL ) )
 	{
 		return 1;
 	}
@@ -22,7 +22,22 @@ main( void )
 		{
 			writeHDMI( ( const char* ) msg.data );
 		}
+	} */
+
+	volatile long int i = 0;
+
+	while(1) {
+
+		writeHDMI("asdf");
+
+		for(i = 0; i < 0x100000; i++) {
+
+		}
 	}
+
+
+
+
 
 	return 0;
 }

@@ -69,13 +69,11 @@ SWI -> IRQ
 // module-local data //////////////////////////////////////////////
 static uint8_t runningPID = 0;
 // module-local functions /////////////////////////////////////////
-static uint32_t scheduleNextReady( UserContext* ctx );
 static Task* getNextReady();
 static void initializeTask( Task* task, uint32_t* entryPoint );
 static int32_t idleTaskFunc( void );
 static void saveCtxToTask( UserContext* ctx, Task* task );
 static void restoreCtxFromTask( UserContext* ctx, Task* task );
-static uint32_t saveCurrentRunning( UserContext* ctx );
 static void allocateStackPointer( Task* task );
 ///////////////////////////////////////////////////////////////////
 

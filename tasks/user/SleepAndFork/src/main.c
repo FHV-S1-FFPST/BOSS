@@ -7,6 +7,8 @@
 
 #include <boss.h>
 
+#include <string.h>
+
 #define GPIO5_OE           (*((volatile unsigned long *)0x49056034))   // Output Data Enable Register (Table 24-27)
 #define GPIO5_DATAOUT      (*((volatile unsigned long *)0x4905603C))   // Data Out register (Table 24-31)
 #define LED1 0x00200000   // Bit 21
@@ -19,15 +21,39 @@
 // SCM
 #define CONTROL_PADCONF_UART1_TX  (*((volatile unsigned long *)0x4800217C))   // Pad configuration for GPIO_149 [31:16] (Tables 7-4 & 7-74)
 
+static MESSAGE msg;
+
 int
 main( void )
 {
+	channelOpen( 3 );
+
+	channelSubscribe( 3 );
+
 	while( 1 )
 	{
 		uint64_t startMillis = getSysMillis();
 
+		receive( NULL_CHANNEL, 0, -1 );
+
 		// wait for a message on NULL-CHANNEL for 1000ms -> will timeout, nullchannel is not existing
-		receive( NULL_CHANNEL, 0, 1000 );
+		receive( NULL_CHANNEL, 0, 10000 );
+
+		const char* str = "Where is my johnny?";
+
+		msg.id = 42;
+		msg.dataSize = 19; //strlen( str );
+		memset( msg.data, 0, sizeof( msg.data ) );
+
+		strncpy( ( char* ) msg.data, str, msg.dataSize );
+
+		send( 3, &msg );
+
+		memset( &msg, 0, sizeof( MESSAGE ) );
+
+		receive( 3, &msg, 0 );
+
+		send( 3, &msg );
 
 		uint64_t stopMillis = getSysMillis();
 		uint64_t deltaMillis = stopMillis - startMillis;

@@ -26,10 +26,6 @@ main( void )
 		}
 		else if ( SERIAL_MSG_READ == msg.id )
 		{
-			uint32_t tmp = msg.receiver;
-			msg.receiver = msg.sender;
-			msg.sender = tmp;
-
 			msg.dataSize = 1;
 			msg.data[ 0 ] = 'X';
 

@@ -199,5 +199,10 @@ loadTaskFromFile( const char* fileName )
 closeAndExit:
 	fat32Close( taskImageFile );
 
+	if ( fileBuffer )
+	{
+		free( fileBuffer );
+	}
+
 	return ret;
 }

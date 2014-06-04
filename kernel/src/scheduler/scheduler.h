@@ -13,7 +13,7 @@
 
 uint32_t schedInit( void );
 uint8_t getCurrentPid( void );
-Task* createTask( uint32_t* entryPoint );
+Task* createTask( uint32_t entryPointVAddress, uint32_t stackPointerVAddress );
 void schedStart( void );
 uint32_t schedule( UserContext* ctx );
 uint32_t saveCurrentRunning( UserContext* ctx );

@@ -13,6 +13,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 // module-local defines
 #define EI_CLASS_32_BIT			0x1
@@ -58,12 +59,26 @@ typedef struct
 
 typedef struct
 {
+	uint32_t sh_name;                	/* Section name (string tbl index) */
+	uint32_t sh_type;                	/* Section type */
+	uint32_t sh_flags;              	/* Section flags */
+	uint32_t sh_addr;           		/* Section virtual addr at execution */
+	uint32_t sh_offset;             	/* Section file offset */
+	uint32_t sh_size;                	/* Section size in bytes */
+	uint32_t sh_link;                	/* Link to another section */
+	uint32_t sh_info;                	/* Additional section information */
+	uint32_t sh_addralign;           	/* Section alignment */
+	uint32_t sh_entsize;             	/* Entry size if section holds table */
+} SECTION_HEADER;
+
+typedef struct
+{
 	uint32_t p_type;
 	uint32_t p_offset;
-	uint32_t p_vaddr;
-	uint32_t p_paddr;
-	uint32_t p_filesz;
-	uint32_t p_memsz;
+	uint32_t p_vaddr;					/* Segment virtual address */
+	uint32_t p_paddr;					/* Segment physical address */
+	uint32_t p_filesz;					/* Segment size in file */
+	uint32_t p_memsz;					/* Segment size in memory */
 	uint32_t p_flags;
 	uint32_t p_align;
 } PROGRAM_HEADER;
@@ -71,8 +86,12 @@ typedef struct
 
 // module-local data
 static uint8_t eIdentMagicNumber[ 4 ] = { 0x7F, 'E', 'L', 'F' };
-
 ///////////////////////////////////////////////////////////////
+
+// module-local functions
+uint32_t getVirtualAddressOfSection( const char* sectionName, ELF_HEADER* elfHeader, uint8_t* dataBuffer );
+///////////////////////////////////////////////////////////////
+
 uint32_t
 loadTaskFromFile( const char* fileName )
 {
@@ -81,6 +100,8 @@ loadTaskFromFile( const char* fileName )
 	uint8_t* fileBuffer = 0;
 	file_id taskImageFile = 0;
 	ELF_HEADER* elfHeader = 0;
+	uint32_t stackPointerAddress = 0;
+
 	Task* task = 0;
 
 	if ( fat32Open( fileName, &taskImageFile ) )
@@ -143,20 +164,33 @@ loadTaskFromFile( const char* fileName )
 		goto closeAndExit;
 	}
 
-	task = createTask( ( uint32_t* ) elfHeader->e_entry );
+	// need to know the stack-pointer to assign it to R13 in initialization
+	stackPointerAddress = getVirtualAddressOfSection( ".stack", elfHeader, fileBuffer );
+	// no stackpointer found, invalid linkage
+	if ( 0 == stackPointerAddress )
+	{
+		ret = 1;
+		goto closeAndExit;
+	}
+
+	// create task in scheduler
+	task = createTask( elfHeader->e_entry, stackPointerAddress );
 	if ( 0 == task )
 	{
 		ret = 1;
 		goto closeAndExit;
 	}
 
+	// switch context to the pagetable of the task and set pid in TLB
 	mmu_ttbSet( ( int32_t ) task->pageTable );
 	mmu_setProcessID( task->pid );
 
+	// iterate all programheaders and load them
 	for ( i = 0; i < elfHeader->e_phnum; ++i )
 	{
 		PROGRAM_HEADER* programHeader = ( PROGRAM_HEADER* ) &fileBuffer[ elfHeader->e_phoff + ( i * elfHeader->e_phentsize ) ];
 
+		// only load program-headers which are loadable
 		if ( PT_LOAD != programHeader->p_type )
 		{
 			continue;
@@ -205,4 +239,28 @@ closeAndExit:
 	}
 
 	return ret;
+}
+
+uint32_t
+getVirtualAddressOfSection( const char* sectionName, ELF_HEADER* elfHeader, uint8_t* dataBuffer )
+{
+	uint32_t i = 0;
+
+	SECTION_HEADER* stringTableEntry = ( SECTION_HEADER* ) &dataBuffer[ elfHeader->e_shoff + ( elfHeader->e_shstrndx * elfHeader->e_shentsize ) ];
+	const char* stringTable = stringTable = ( const char* ) &dataBuffer[ stringTableEntry->sh_offset ];
+
+	for ( i = 0; i < elfHeader->e_shnum; ++i )
+	{
+		SECTION_HEADER* sectionHeader = ( SECTION_HEADER* ) &dataBuffer[ elfHeader->e_shoff + ( i * elfHeader->e_shentsize ) ];
+
+		if ( sectionHeader->sh_name )
+		{
+			if ( 0 == strcasecmp( &stringTable[ sectionHeader->sh_name ], sectionName ) )
+			{
+				return sectionHeader->sh_addr;
+			}
+		}
+	}
+
+	return 0;
 }

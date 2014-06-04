@@ -70,18 +70,18 @@ SWI -> IRQ
 static uint8_t runningPID = 0;
 // module-local functions /////////////////////////////////////////
 static Task* getNextReady();
-static void initializeTask( Task* task, uint32_t* entryPoint );
+static void initializeTask( Task* task, uint32_t entryPointVAddress, uint32_t stackPointerVAddress );
 static int32_t idleTaskFunc( void );
 static void saveCtxToTask( UserContext* ctx, Task* task );
 static void restoreCtxFromTask( UserContext* ctx, Task* task );
-static void allocateStackPointer( Task* task );
 ///////////////////////////////////////////////////////////////////
 
 uint32_t
 schedInit()
 {
 	// create idle-task first, it MUST BE at pid 0
-	createTask( ( uint32_t* ) idleTaskFunc );
+	// TODO: need a valid stackpointer for idle-function!
+	createTask( ( uint32_t ) idleTaskFunc, 0 );
 
 	irqRegisterClbk( schedule, GPT2_IRQ );
 	irqTimerInit( SCHEDULE_INTERVAL_MS );
@@ -102,13 +102,11 @@ getCurrentPid( void )
 }
 
 Task*
-createTask( uint32_t* entryPoint )
+createTask( uint32_t entryPointVAddress, uint32_t stackPointerVAddress )
 {
 	Task newTask;
 
-	initializeTask( &newTask, entryPoint );
-
-	allocateStackPointer( &newTask );
+	initializeTask( &newTask, entryPointVAddress, stackPointerVAddress );
 
 	newTask.pageTable = mmu_allocate_task( newTask.pid );
 
@@ -116,46 +114,6 @@ createTask( uint32_t* entryPoint )
 
 	return getTask( newTask.pid );
 }
-
-/*
-int32_t
-fork()
-{
-	// TODO: pc is other space, need to calculate it according to the image
-
-	Task* newTask = createTask( currentUserCtx->pc );
-
-	// the child process will receive the content of the registers of the parent process
-	memcpy( newTask->reg, currentUserCtx->regs, sizeof( newTask->reg ) );
-	// set register 0 of child-process to 0 to notify that the process is the child process
-	newTask->reg[ 0 ] = 0;
-
-	// fork will return 1 for caller which is the parent process
-	currentUserCtx->regs[ 0 ] = 1;
-
-	return 0;
-}
-*/
-
-/*
-int32_t
-sleep( uint32_t millis )
-{
-	saveCurrentRunning( currentUserCtx );
-	uint32_t systemMillis = getSysMillis();
-
-	Task* runningTask = getTask( runningPID );
-	runningTask->state = SLEEPING;
-	runningTask->waitUntil = systemMillis + millis;
-
-	// TODO: problem: when new to schedule task has never run, the PC will point one instruction too far because createtask incremented it
-	// 		 it is ok when it already ran because the current instruction is interrupted by the IRQ and thus not executed and needs to be executed again
-
-	scheduleNextReady( currentUserCtx );
-
-	return 0;
-}
-*/
 
 // NOTE: this is a callback called by irq
 uint32_t
@@ -228,7 +186,7 @@ uint32_t
 saveCurrentRunning( UserContext* ctx )
 {
 	Task* task = getTask( runningPID );
-	// TODO: when no task has ever run in the system there is no current running task, so
+	// NOTE: when no task has ever run in the system there is no current running task, so
 	// this if will hit one time only, thus try to remove it in future
 	if ( RUNNING == task->state )
 	{
@@ -318,24 +276,15 @@ restoreCtxFromTask( UserContext* ctx, Task* task )
 }
 
 void
-allocateStackPointer( Task* task )
-{
-	// TODO: replace malloc by other facilitys when virtual memory and process creation is implemented
-	void* stackPtr = ( void*) malloc( 1024 );
-	memset( stackPtr, 'a', 1024 );
-
-	task->regs[ 13 ] = ( uint32_t ) stackPtr;
-}
-
-void
-initializeTask( Task* task, uint32_t* entryPoint )
+initializeTask( Task* task, uint32_t entryPointVAddress, uint32_t stackPointerVAddress )
 {
 	memset( task, 0, sizeof( Task ) );
 
 	task->state = READY;
 	task->pid = getNextFreePID();
-	task->initPC = entryPoint;
+	task->initPC = ( uint32_t* ) entryPointVAddress;
 	task->cpsr = USERMODE_WITHIRQ_CPSR;
+	task->regs[ 13 ] = stackPointerVAddress;
 }
 
 int32_t

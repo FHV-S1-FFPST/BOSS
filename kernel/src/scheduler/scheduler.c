@@ -68,7 +68,6 @@ SWI -> IRQ
 // module-local data //////////////////////////////////////////////
 static uint8_t runningPID = 0;
 // module-local functions /////////////////////////////////////////
-static uint32_t schedule( UserContext* ctx );
 static uint32_t scheduleNextReady( UserContext* ctx );
 static Task* getNextReady();
 static void initializeTask( Task* task, uint32_t* entryPoint );
@@ -283,8 +282,8 @@ getNextReady()
 			if ( ( task->waitUntil ) && ( task->waitUntil <= currentMillis ) )
 			{
 				task->state = READY;
-
-				// TODO: set return-register
+				// receive returns -1 when timeout occurs
+				task->regs[ 0 ] = -1;
 
 				return task;
 			}
@@ -308,7 +307,7 @@ saveCtxToTask( UserContext* ctx, Task* task)
 	task->state = READY;
 	task->pc = ctx->pc;
 	task->cpsr = ctx->cpsr;
-	memcpy( task->reg, ctx->regs, sizeof( task->reg ) );
+	memcpy( task->regs, ctx->regs, sizeof( task->regs ) );
 }
 
 void
@@ -316,7 +315,7 @@ restoreCtxFromTask( UserContext* ctx, Task* task )
 {
 	ctx->pc = task->pc;
 	ctx->cpsr = task->cpsr;
-	memcpy( ctx->regs, task->reg, sizeof( task->reg ) );
+	memcpy( ctx->regs, task->regs, sizeof( task->regs ) );
 }
 
 void
@@ -326,7 +325,7 @@ allocateStackPointer( Task* task )
 	void* stackPtr = ( void*) malloc( 1024 );
 	memset( stackPtr, 'a', 1024 );
 
-	task->reg[ 13 ] = ( uint32_t ) stackPtr;
+	task->regs[ 13 ] = ( uint32_t ) stackPtr;
 }
 
 void

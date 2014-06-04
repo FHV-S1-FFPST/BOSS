@@ -22,7 +22,7 @@
 int
 main( void )
 {
-	/*while( 1 )
+	while( 1 )
 	{
 		uint64_t startMillis = getSysMillis();
 
@@ -33,9 +33,9 @@ main( void )
 		uint64_t deltaMillis = stopMillis - startMillis;
 
 		deltaMillis++;
-	} */
+	}
 
-
+/*
 	  volatile long int i;
 
 	  // Set the pinmux to select the GPIO signal
@@ -55,6 +55,7 @@ main( void )
 	    for (i=0; i<0x100000; i++) {}
 	      GPIO5_DATAOUT ^=  LED1;  // Toggle GPIO_149
 	  }
+	  */
 }
 
 /*

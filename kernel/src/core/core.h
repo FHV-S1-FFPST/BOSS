@@ -14,7 +14,7 @@ typedef struct
 {
 	uint32_t cpsr;
 	uint32_t* pc;
-	uint32_t regs[15];
+	int32_t regs[15];
 } UserContext;
 
 typedef enum

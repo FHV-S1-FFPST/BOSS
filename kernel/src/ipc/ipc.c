@@ -24,11 +24,11 @@ channelClose( uint32_t channelId )
 }
 
 int32_t
-channelAttach( uint32_t channelId )
+channelSubscribe( uint32_t channelId )
 {
 	Task* t = getTask( getCurrentPid() );
 
-	return channel_attach( channelId, t );
+	return channel_subscribe( channelId, t );
 }
 
 int32_t

@@ -8,6 +8,7 @@
 #include "task/taskLoader.h"
 #include "page_manager/pageManager.h"
 #include "sdrc/sdrc.h"
+#include "ipc/channel.h"
 
 /**
  * Prototypes
@@ -99,6 +100,11 @@ initOs( void )
 	}
 
 	if( schedInit() )
+	{
+		return 1;
+	}
+
+	if ( channel_open( NULL_CHANNEL ) )
 	{
 		return 1;
 	}

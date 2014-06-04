@@ -83,9 +83,9 @@ swiHandler( uint32_t swiId, UserContext* ctx )
 	{
 		ret = channelClose( ctx->regs[ 0 ] );
 	}
-	else if ( SYSC_CH_ATTACH == swiId )
+	else if ( SYSC_CH_SUBSCRIBE == swiId )
 	{
-		ret = channelAttach( ctx->regs[ 0 ] );
+		ret = channelSubscribe( ctx->regs[ 0 ] );
 	}
 	/*
 	else if ( SYSC_CREATETASK == swiId )

@@ -25,7 +25,7 @@
 // IPC CALLS
 #define SYSC_CH_OPEN			8
 #define SYSC_CH_CLOSE			9
-#define SYSC_CH_ATTACH			10
+#define SYSC_CH_SUBSCRIBE		10
 
 #define SYSC_SEND				11
 #define SYSC_RECEIVE			12
@@ -46,7 +46,7 @@
 	// IPC CALLS
 	#pragma SWI_ALIAS( channelOpen, SYSC_CH_OPEN );
 	#pragma SWI_ALIAS( channelClose, SYSC_CH_CLOSE );
-	#pragma SWI_ALIAS( channelAttach, SYSC_CH_ATTACH );
+	#pragma SWI_ALIAS( channelSubscribe, SYSC_CH_SUBSCRIBE );
 
 	#pragma SWI_ALIAS( send, SYSC_SEND );
 	#pragma SWI_ALIAS( receive, SYSC_RECEIVE );
@@ -73,8 +73,8 @@ typedef struct
 {
 	uint32_t id;
 
-	uint8_t receiver;
-	uint8_t sender;
+	uint8_t receiver; 	// TODO: remove
+	uint8_t sender;		// TODO: remove
 
 	uint8_t data[ MESSAGE_MAX_DATA_SIZE ];
 	uint8_t dataSize;
@@ -96,11 +96,11 @@ int32_t channelOpen( uint32_t channelId );
  */
 int32_t channelClose( uint32_t channelId );
 /**
- * Attaches to an opened channel with the given id.
+ * Subscribers to an opened channel with the given id.
  * If channel doesnt exist it returns 1.
  * If succeeds return 0.
  */
-int32_t channelAttach( uint32_t channelId );
+int32_t channelSubscribe( uint32_t channelId );
 
 /**
  * Sends async a message to the given channel.
@@ -114,6 +114,8 @@ int32_t send( uint32_t channelId, MESSAGE* msg );
  * If timeout is -1, it will return immediately if no message is present and will have msg set to 0.
  *
  * returns 0 if message a was received
+ * returns -1 if timeout occured
+ * return > 0 for other errors
  */
 int32_t receive( uint32_t channelId, MESSAGE* msg, int32_t timeout );
 

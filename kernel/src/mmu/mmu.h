@@ -17,10 +17,10 @@ uint32_t mmu_init( void );
  */
 uint32_t* mmu_allocate_task();
 /**
- * maps the memory at mem with size of memSize to the address given at addr into
+ * maps memory of of mapSize bytes to the address given at addr into
  * the space of task with pid by creating a new L2 region with the necessary number of pages.
  */
-uint32_t mmu_map_memory( Task* task, uint32_t addr, uint8_t* mem, uint32_t memSize );
+uint32_t mmu_map_memory( Task* task, uint32_t addr, uint32_t mapSize );
 
 void mmu_ttbSet(uint32_t ttbAddr);
 void mmu_tlbFlush(void);

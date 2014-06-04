@@ -109,7 +109,7 @@ swiHandler( uint32_t swiId, UserContext* ctx )
 	}
 	else if ( SYSC_PID == swiId )
 	{
-		ret = getSysMillisSysCall();
+		ret = getPid();
 	}
 	else
 	{

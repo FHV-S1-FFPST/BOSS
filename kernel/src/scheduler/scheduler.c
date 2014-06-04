@@ -275,7 +275,7 @@ getNextReady()
 			}
 		}
 
-		// task is waiting for a message
+		// task is waiting for a message (called receive sys-call)
 		if ( WAITING == task->state )
 		{
 			// a timeout is specified, check if it is hit

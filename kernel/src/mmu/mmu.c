@@ -8,7 +8,7 @@
 #include "mmu.h"
 
 #include "../common/common.h"
-#include <string.h>
+
 #include "../page_manager/pageManager.h"
 
 // module-local defines
@@ -215,24 +215,19 @@ mmu_allocate_task()
 }
 
 uint32_t
-mmu_map_memory( Task* task, uint32_t addr, uint8_t* mem, uint32_t memSize )
+mmu_map_memory( Task* task, uint32_t addr, uint32_t mapSize )
 {
 	_memMapRegionTemplate.parentAddress = task->pageTable;
-	_memMapRegionTemplate.numPages = ( memSize / ( _memMapRegionTemplate.pageSize * 1024 ) );
+	_memMapRegionTemplate.numPages = ( mapSize / ( _memMapRegionTemplate.pageSize * 1024 ) );
 	_memMapRegionTemplate.vAddress = addr;
 	_memMapRegionTemplate.physicalStartAdress = addr;
 
-	if ( memSize % ( _memMapRegionTemplate.pageSize * 1024 ) )
+	if ( mapSize % ( _memMapRegionTemplate.pageSize * 1024 ) )
 	{
 		_memMapRegionTemplate.numPages++;
 	}
 
 	mmu_mapRegion( &_memMapRegionTemplate, task->pid );
-
-	mmu_ttbSet( ( int32_t ) task->pageTable );
-	mmu_setProcessID( task->pid );
-
-	memcpy( ( uint8_t* ) addr, mem, memSize );
 
 	return 0;
 }

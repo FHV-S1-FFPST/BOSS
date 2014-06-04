@@ -150,6 +150,9 @@ loadTaskFromFile( const char* fileName )
 		goto closeAndExit;
 	}
 
+	mmu_ttbSet( ( int32_t ) task->pageTable );
+	mmu_setProcessID( task->pid );
+
 	for ( i = 0; i < elfHeader->e_phnum; ++i )
 	{
 		PROGRAM_HEADER* programHeader = ( PROGRAM_HEADER* ) &fileBuffer[ elfHeader->e_phoff + ( i * elfHeader->e_phentsize ) ];
@@ -159,9 +162,36 @@ loadTaskFromFile( const char* fileName )
 			continue;
 		}
 
+		uint32_t mapSize = 0;
+		int32_t memDelta = programHeader->p_memsz - programHeader->p_filesz;
+
+		// if size in file is not 0, take this as a lower bound for mapping-size
+		if ( 0 != programHeader->p_filesz )
+		{
+			mapSize = programHeader->p_filesz;
+		}
+
+		// if size in memory is not 0, take this as an upper bound for mapping-size, as it is at least the size of p_filesz if not 0
+		if ( 0 != programHeader->p_memsz )
+		{
+			mapSize = programHeader->p_memsz;
+		}
+
 		// TODO: p_vaddr has to be a multiple of page-size otherwise it could be that it will be mapped to the same address
 
-		mmu_map_memory( task, programHeader->p_vaddr, &fileBuffer[ programHeader->p_offset ], programHeader->p_memsz );
+		mmu_map_memory( task, programHeader->p_vaddr, mapSize );
+
+		// if size in file is not 0, there is some data to copy
+		if ( 0 != programHeader->p_filesz )
+		{
+			memcpy( ( uint32_t* ) programHeader->p_vaddr, &fileBuffer[ programHeader->p_offset ], programHeader->p_filesz );
+		}
+
+		// check if there is some data left to be set to 0
+		if ( 0 < memDelta )
+		{
+			memset( &( ( uint32_t* ) programHeader->p_vaddr )[ programHeader->p_filesz ], 0, memDelta );
+		}
 	}
 
 	ret = 0;

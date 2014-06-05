@@ -7,11 +7,11 @@
 
 #include "fat32.h"
 
+#include "../../core/kmalloc.h"
 #include "../../hal/sd/sd_hal.h"
 
 #include <string.h>
 #include <strings.h>
-#include <stdlib.h>
 #include <ctype.h>
 
 /**
@@ -218,10 +218,6 @@ fat32Init( void )
 {
 	// TODO: need to get an interrupt when card is inserted
 
-	// TODO: when do we REALLY need to initialize SDHAL and FAT32?
-	//			-> one time only at startup? or lazy initialization upon first access?
-	//			-> every time a SD card is inserted? then how do we detect when a SD card is inserted?
-
 	// initialize sd
 	if ( sdHalInit() )
 	{
@@ -263,10 +259,10 @@ fat32Open( const char* filePath, file_id* fileId )
 	fd->dirEntry = entry;
 	fd->currentCluster = entry->startClusterNumber;
 
-	fd->currentFatSectorBuffer = malloc( _fat32Bps.bytes_per_sector );
+	fd->currentFatSectorBuffer = kmalloc( _fat32Bps.bytes_per_sector );
 	memset( fd->currentFatSectorBuffer, 0, _fat32Bps.bytes_per_sector );
 
-	fd->currentClusterBuffer = malloc( _clusterBufferSize );
+	fd->currentClusterBuffer = kmalloc( _clusterBufferSize );
 	memset( fd->currentClusterBuffer, 0, _clusterBufferSize );
 
 	*fileId = fId;
@@ -297,8 +293,8 @@ fat32Close( file_id fileId )
 		return 1;
 	}
 
-	free( fd->currentFatSectorBuffer );
-	free( fd->currentClusterBuffer );
+	kfree( fd->currentFatSectorBuffer );
+	kfree( fd->currentClusterBuffer );
 
 	memset( fd, 0, sizeof( FILE_DESCRIPTOR ) );
 
@@ -494,7 +490,7 @@ loadFsRoot( void )
 
 	// allocate memory to hold one complete cluster
 	_clusterBufferSize = _fat32Bps.bytes_per_sector * _fat32Bps.sectors_per_cluster;
-	_clusterBuffer = malloc( _clusterBufferSize );
+	_clusterBuffer = kmalloc( _clusterBufferSize );
 	memset( _clusterBuffer, 0, _clusterBufferSize );
 
 	if ( loadDirectory( _clusterBegin_lba, &_fsRoot ) )
@@ -525,7 +521,7 @@ readDirectory( uint8_t* buffer, DIR_ENTRY* dir )
 	uint32_t childIndex = 0;
 
 	dir->childrenCount = countChildren( buffer );
-	dir->children = malloc( dir->childrenCount * sizeof( DIR_ENTRY ) );
+	dir->children = kmalloc( dir->childrenCount * sizeof( DIR_ENTRY ) );
 	memset( dir->children, 0, dir->childrenCount * sizeof( DIR_ENTRY ) );
 
 	for ( i = 0; i < _bytesPerCluster; i += 32 )

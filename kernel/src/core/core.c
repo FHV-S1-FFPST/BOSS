@@ -23,6 +23,8 @@
 
 // module-local data //////////////////////////////////////////////
 static uint64_t systemMillis;
+///////////////////////////////////////////////////////////////////
+
 // module-local functions /////////////////////////////////////////
 static uint32_t handleSystemTimerOverflow( UserContext* ctx );
 static int32_t getSysMillisSysCall( void );
@@ -87,22 +89,6 @@ swiHandler( uint32_t swiId, UserContext* ctx )
 	{
 		ret = channelSubscribe( ctx->regs[ 0 ] );
 	}
-	/*
-	else if ( SYSC_CREATETASK == swiId )
-	{
-		//task_func entryPoint = ( task_func ) ctx->regs[ 0 ];
-		//ret = createTask( entryPoint );
-		ret = 1;
-	}
-	else if ( SYSC_FORK == swiId )
-	{
-		ret = fork();
-	}
-	else if ( SYSC_SLEEP == swiId )
-	{
-		ret = sleep( ctx->regs[ 0 ] );
-	}
-	*/
 	else if ( SYSC_SYSMILLIS == swiId )
 	{
 		ret = getSysMillisSysCall();
@@ -134,13 +120,13 @@ dataAbortHandler( uint32_t faultStatusReg, uint32_t faultAddress )
 void
 prefetchAbortHandler()
 {
-	// implement when necessary
+	// implement if necessary
 }
 
 interrupt
 void undefInstrHandler()
 {
-	// implement when necessary
+	// implement if necessary
 }
 
 int32_t

@@ -7,11 +7,11 @@
 
 #include "taskLoader.h"
 
+#include "../core/kmalloc.h"
 #include "../fs/fat32/fat32.h"
 #include "../scheduler/scheduler.h"
 #include "../mmu/mmu.h"
 
-#include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 
@@ -111,7 +111,7 @@ loadTaskFromFile( const char* fileName )
 
 	fat32Size( taskImageFile, &fileSize );
 
-	fileBuffer = ( uint8_t* ) malloc( fileSize );
+	fileBuffer = ( uint8_t* ) kmalloc( fileSize );
 	if ( 0 == fileBuffer )
 	{
 		return 1;
@@ -235,7 +235,7 @@ closeAndExit:
 
 	if ( fileBuffer )
 	{
-		free( fileBuffer );
+		kfree( fileBuffer );
 	}
 
 	return ret;

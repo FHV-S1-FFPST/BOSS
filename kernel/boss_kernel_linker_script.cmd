@@ -27,8 +27,6 @@ SECTIONS
 	.cinit      > ext_ddr_os
 	.cio        > ext_ddr_os
 
-	.heap		> ext_ddr_os
-
 	.text       > ext_ddr_os
 	.sysmem     > ext_ddr_os
 

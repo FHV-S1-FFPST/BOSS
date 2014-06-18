@@ -98,7 +98,7 @@ channel_subscribe( uint32_t channelId, Task* task )
 	channel->subscribers[ channel->subscribersInsertPos ] = task;
 	channel->subscribersInsertPos = NEXT_SUBSCRIBER_INSERTPOS( channel );
 
-	return 1;
+	return 0;
 }
 
 uint32_t
@@ -151,7 +151,7 @@ channel_receivesMessage( uint32_t channelId, MESSAGE* msg )
 	return 0;
 }
 
-uint32_t
+int32_t
 channel_waitForMessage( uint32_t channelId, Task* t, int32_t timeout )
 {
 	// NOTE: sleep is done using a receive with timeout on NULL-CHANNEL
@@ -181,13 +181,12 @@ channel_waitForMessage( uint32_t channelId, Task* t, int32_t timeout )
 			MESSAGE* msg = &channel->msgQueue[ channel->msgQueueStartPos ];
 
 			copyMessageToTaskSpace( msg );
-			// receive returns 0 when message received
-			// NOTE: use currentUserCtx because the call receive is from a currently running task
-			currentUserCtx->regs[ 0 ] = 0;
 
 			// clean-up message
 			channel->msgQueueStartPos = NEXT_MSG_QUEUE_STARTPOS( channel );
 
+			// receive returns 0 when message received
+			// NOTE: will be written to currentUserCtx because the call receive is from a currently running task
 			return 0;
 		}
 
@@ -197,10 +196,8 @@ channel_waitForMessage( uint32_t channelId, Task* t, int32_t timeout )
 		if ( 0 > timeout )
 		{
 			// receive returns -1 when no message received
-			// NOTE: use currentUserCtx because the call receive is from a currently running task
-			currentUserCtx->regs[ 0 ] = -1;
-
-			return 0;
+			// NOTE: will be written to currentUserCtx because the call receive is from a currently running task
+			return -1;
 		}
 
 		// timeout is >= 0: wait until message arrives or timeout hits

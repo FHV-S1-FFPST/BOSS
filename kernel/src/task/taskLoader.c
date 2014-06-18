@@ -165,7 +165,6 @@ loadTaskFromFile( const char* fileName )
 		goto closeAndExit;
 	}
 
-
 	// need to know the stack-pointer to assign it to R13 in initialization
 	stackPointerAddress = getVirtualAddressOfSection( ".stack", elfHeader, fileBuffer );
 	// no stackpointer found, invalid linkage
@@ -260,7 +259,8 @@ getVirtualAddressOfSection( const char* sectionName, ELF_HEADER* elfHeader, uint
 
 		if ( sectionHeader->sh_name )
 		{
-			if ( 0 == strcasecmp( &stringTable[ sectionHeader->sh_name ], sectionName ) )
+			const char* currSectionName = &stringTable[ sectionHeader->sh_name ];
+			if ( 0 == strcasecmp( currSectionName, sectionName ) )
 			{
 				return sectionHeader->sh_addr;
 			}

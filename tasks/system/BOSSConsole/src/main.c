@@ -18,6 +18,9 @@ main( void )
 	}
 	*/
 
+	// NOTE: need to wait 1000ms to ensure HDMI-channel was opened before by HDMI-driver
+	receive( NULL_CHANNEL, 0, 1000 );
+
 	if ( channelSubscribe( HDMI_CHANNEL ) )
 	{
 		return 1;

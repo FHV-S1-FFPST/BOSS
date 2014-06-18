@@ -31,44 +31,6 @@ main( void )
 		return 1;
 	}
 
-	/* THIS IS THE ACCESS PATTERN
-	    allocate:
-		4096
-		64
-		160
-		512
-		4096
-		50516
-
-		free:
-		512
-		4096
-		50516
-
-		allocate:
-		512
-		4096 -> returns 0 -> data abort
-
-	void* addr = 0;
-	void* addrFree1 = 0;
-	void* addrFree2 = 0;
-	void* addrFree3 = 0;
-
-	addr = malloc( 4096 );
-	addr = malloc( 64 );
-	addr = malloc( 160 );
-	addrFree1 = malloc( 512 );
-	addrFree2 = malloc( 4096 );
-	addrFree3 = malloc( 50516 );
-
-	free( addrFree1 );
-	free( addrFree2 );
-	free( addrFree3 );
-
-	addr = malloc( 512 );	// <- returns address from addrFree1 => seems to be working correct!
-	addr = malloc( 4096 );
-*/
-
 	if ( initOs() )
 	{
 		// initializing OS failed, exit OS
@@ -157,9 +119,9 @@ initDrivers( void )
 	}
 
 	loadTaskFromFile( "sys/hdmidrv.out" );
-	loadTaskFromFile( "sys/console.out" );
 
 	/*
+	 * loadTaskFromFile( "sys/console.out" );
 	loadTaskFromFile( "sys/rs232drv.out" );
 	loadTaskFromFile( "usr/saf.out");
 */

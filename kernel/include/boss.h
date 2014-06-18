@@ -31,10 +31,10 @@
 #define SYSC_RECEIVE			12
 #define SYSC_SENDRCV			13
 
-// TASK-MANAGEMENT CALLS
-//#define SYSC_CREATETASK			14
-//#define SYSC_FORK				15
-//#define SYSC_SLEEP				16
+// REGISTER-ACCESS CALLS
+#define SYSC_READ_REG			14
+#define SYSC_WRITE_REG			15
+//#define SYSC_SLEEP			16
 
 // MISC CALLS
 #define SYSC_SYSMILLIS			17
@@ -53,8 +53,8 @@
 	#pragma SWI_ALIAS( sendrcv, SYSC_SENDRCV );
 
 	// TASK-MANAGEMENT CALLS
-	//#pragma SWI_ALIAS( createTask, SYSC_CREATETASK );
-	//#pragma SWI_ALIAS( fork, SYSC_FORK );
+	#pragma SWI_ALIAS( readReg, SYSC_READ_REG );
+	#pragma SWI_ALIAS( writeReg, SYSC_WRITE_REG );
 	//#pragma SWI_ALIAS( sleep, SYSC_SLEEP );
 
 	// MISC CALLS
@@ -123,24 +123,15 @@ int32_t receive( uint32_t channelId, MESSAGE* msg, int32_t timeout );
  */
 int32_t sendrcv( uint32_t channelId, MESSAGE* msg, uint32_t timeout );
 
-// Task-management calls
 /**
- * Starts a process from the given process-function.
+ * Reads the value from a given register and returns it.
  */
-//int32_t createTask( task_func entryPoint );
+uint32_t readReg( uint32_t address );
 
 /**
- * Forks the task. Will return 0 for the child-task and > 0 for the parent-task.
- *
- * int32_t fork();
+ * Writes a value to a given register.
  */
-
-/**
- * Suspends the task for at least the given milliseconds.
- * TODO: replace by a receive on the null-channel with a given timeout of millis
- *
- * int32_t sleep( uint32_t millis );
- */
+uint32_t writeReg( uint32_t address, uint32_t value );
 
 /**
  * Returns the milliseconds since the system was started.

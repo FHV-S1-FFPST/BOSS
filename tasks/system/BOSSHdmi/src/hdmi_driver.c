@@ -10,8 +10,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define reg32w(b, r, v) (*((volatile uint32_t *)((b)+(r))) = (v))
-#define reg32r(b, r) (*(volatile uint32_t *)((b)+(r)))
+//#define reg32w(b, r, v) (*((volatile uint32_t *)((b)+(r))) = (v))
+//#define reg32r(b, r) (*(volatile uint32_t *)((b)+(r)))
+
+#define reg32w(b, r, v) 	writeReg( b + r, v )
+#define reg32r(b, r) 		readReg( b + r )
 
 static unsigned char font[2048] =
 {
@@ -450,12 +453,8 @@ openHDMI( void )
 	reg32w(DSPC_BASE, DSPC_TIMING_H, 0x0cf03f31);
 	reg32w(DSPC_BASE, DSPC_TIMING_V, 0x01400504);
 
+	// NOTE: MALLOC DOESNT WORK FOR NOW - will run into a prefetch abort!
 	framebuff = malloc(buffSize);
-	/*int i;
-	for(i = 0; i < buffSize; i++) {
-		framebuff[i] = (char) (rand() % 255);
-	} */
-
 	memset(framebuff, 0, buffSize);
 
 	reg32w(DSPC_BASE, DSPC_GFX_BA1, (uint32_t) framebuff);

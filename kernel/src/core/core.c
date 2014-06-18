@@ -13,6 +13,8 @@
 #include "../common/common.h"
 #include "../irq/irq.h"
 #include "../scheduler/scheduler.h"
+#include "../ipc/channel.h"
+#include "../task/taskTable.h"
 
 // third includes: project-includes
 #include <boss.h>
@@ -53,11 +55,9 @@ querySystemState( void )
 }
 
 // NOTE: not marked with interrupt, applied different technique to handle SWI
-int32_t
+void
 swiHandler( uint32_t swiId, UserContext* ctx )
 {
-	int32_t ret = 0;
-
 	currentUserCtx = ctx;
 
 	if ( SYSC_SEND == swiId || SYSC_RECEIVE == swiId || SYSC_SENDRCV == swiId )
@@ -66,43 +66,53 @@ swiHandler( uint32_t swiId, UserContext* ctx )
 
 		if ( SYSC_SEND == swiId )
 		{
-			ret = send( ctx->regs[ 0 ], msg );
+			ctx->regs[ 0 ] = channel_receivesMessage( ctx->regs[ 0 ], msg );
 		}
 		else if ( SYSC_RECEIVE == swiId )
 		{
-			ret = receive( ctx->regs[ 0 ], msg, ( int32_t ) ctx->regs[ 2 ] );
+			ctx->regs[ 0 ] = channel_waitForMessage( ctx->regs[ 0 ], getTask( getCurrentPid() ), ctx->regs[ 2 ] );
 		}
 		else if ( SYSC_SENDRCV == swiId )
 		{
-			ret = sendrcv( ctx->regs[ 0 ], msg, ctx->regs[ 2 ] );
+			if ( channel_receivesMessage( ctx->regs[ 0 ], msg ) )
+			{
+				ctx->regs[ 0 ] = 1;
+			}
+			else
+			{
+				ctx->regs[ 0 ] = channel_waitForMessage( ctx->regs[ 0 ], getTask( getCurrentPid() ), ctx->regs[ 2 ] );
+			}
 		}
 	}
 	else if ( SYSC_CH_OPEN == swiId )
 	{
-		ret = channelOpen( ctx->regs[ 0 ] );
+		ctx->regs[ 0 ] = channel_open( ctx->regs[ 0 ] );
 	}
 	else if ( SYSC_CH_CLOSE == swiId )
 	{
-		ret = channelClose( ctx->regs[ 0 ] );
+		ctx->regs[ 0 ] = channel_close( ctx->regs[ 0 ] );
 	}
 	else if ( SYSC_CH_SUBSCRIBE == swiId )
 	{
-		ret = channelSubscribe( ctx->regs[ 0 ] );
+		ctx->regs[ 0 ] = channel_subscribe( ctx->regs[ 0 ], getTask( getCurrentPid() ) );
 	}
 	else if ( SYSC_SYSMILLIS == swiId )
 	{
-		ret = getSysMillisSysCall();
+		getSysMillisSysCall();
 	}
 	else if ( SYSC_PID == swiId )
 	{
-		ret = getPid();
+		getPid();
 	}
-	else
+	else if ( SYSC_READ_REG == swiId )
 	{
-		ret = -1;
+		uint32_t value = READ_REGISTER( ctx->regs[ 0 ] );
+		ctx->regs[ 0 ] = value;
 	}
-
-	return ret;
+	else if ( SYSC_WRITE_REG == swiId )
+	{
+		READ_REGISTER( ctx->regs[ 0 ] ) = ctx->regs[ 1 ];
+	}
 }
 
 uint32_t

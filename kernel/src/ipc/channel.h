@@ -15,6 +15,6 @@ uint32_t channel_close( uint32_t channelId );
 uint32_t channel_subscribe( uint32_t channelId, Task* task );
 
 uint32_t channel_receivesMessage( uint32_t channelId, MESSAGE* msg );
-uint32_t channel_waitForMessage( uint32_t channelId, Task* task, int32_t timeout );
+int32_t channel_waitForMessage( uint32_t channelId, Task* task, int32_t timeout );
 
 #endif /* CHANNEL_H_ */

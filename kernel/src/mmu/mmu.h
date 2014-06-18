@@ -22,6 +22,11 @@ uint32_t* mmu_allocate_task();
  */
 uint32_t mmu_map_memory( Task* task, uint32_t addr, uint32_t mapSize );
 
+/**
+ * resets the TTB to the address of MASTER PT
+ */
+void mmu_ttbReset();
+
 void mmu_ttbSet(uint32_t ttbAddr);
 void mmu_tlbFlush(void);
 void mmu_setProcessID(uint8_t pid);

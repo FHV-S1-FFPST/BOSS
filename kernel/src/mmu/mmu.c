@@ -393,6 +393,10 @@ void mmu_initPagetable(Pagetable* pt) {
 	}
 }
 
+void mmu_ttbReset() {
+	mmu_ttbSet( MASTER_PT_ADDR );
+}
+
 void mmu_domainAccessSet(uint32_t value, uint32_t mask) {
 	_mmu_setDomainAccess(value, mask);
 }

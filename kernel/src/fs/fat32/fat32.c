@@ -7,14 +7,16 @@
 
 #include "fat32.h"
 
-#include "../../core/kmalloc.h"
 #include "../../hal/sd/sd_hal.h"
 
+#include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 #include <ctype.h>
 
 /**
+ * WARNING: THIS IMPLEMENTATION SEEMS ONLY TO WORK WITH SECTOR-SIZES OF 512 BYTES!
+ *
  * Sources for implementation:
  * Microsoft fat32 spec
  * https://www.pjrc.com/tech/8051/ide/fat32.html
@@ -259,10 +261,10 @@ fat32Open( const char* filePath, file_id* fileId )
 	fd->dirEntry = entry;
 	fd->currentCluster = entry->startClusterNumber;
 
-	fd->currentFatSectorBuffer = kmalloc( _fat32Bps.bytes_per_sector );
+	fd->currentFatSectorBuffer = malloc( _fat32Bps.bytes_per_sector );
 	memset( fd->currentFatSectorBuffer, 0, _fat32Bps.bytes_per_sector );
 
-	fd->currentClusterBuffer = kmalloc( _clusterBufferSize );
+	fd->currentClusterBuffer = malloc( _clusterBufferSize );
 	memset( fd->currentClusterBuffer, 0, _clusterBufferSize );
 
 	*fileId = fId;
@@ -293,8 +295,8 @@ fat32Close( file_id fileId )
 		return 1;
 	}
 
-	kfree( fd->currentFatSectorBuffer );
-	kfree( fd->currentClusterBuffer );
+	free( fd->currentFatSectorBuffer );
+	free( fd->currentClusterBuffer );
 
 	memset( fd, 0, sizeof( FILE_DESCRIPTOR ) );
 
@@ -490,7 +492,7 @@ loadFsRoot( void )
 
 	// allocate memory to hold one complete cluster
 	_clusterBufferSize = _fat32Bps.bytes_per_sector * _fat32Bps.sectors_per_cluster;
-	_clusterBuffer = kmalloc( _clusterBufferSize );
+	_clusterBuffer = malloc( _clusterBufferSize );
 	memset( _clusterBuffer, 0, _clusterBufferSize );
 
 	if ( loadDirectory( _clusterBegin_lba, &_fsRoot ) )
@@ -521,7 +523,7 @@ readDirectory( uint8_t* buffer, DIR_ENTRY* dir )
 	uint32_t childIndex = 0;
 
 	dir->childrenCount = countChildren( buffer );
-	dir->children = kmalloc( dir->childrenCount * sizeof( DIR_ENTRY ) );
+	dir->children = malloc( dir->childrenCount * sizeof( DIR_ENTRY ) );
 	memset( dir->children, 0, dir->childrenCount * sizeof( DIR_ENTRY ) );
 
 	for ( i = 0; i < _bytesPerCluster; i += 32 )

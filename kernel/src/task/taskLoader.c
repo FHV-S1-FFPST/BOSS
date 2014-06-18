@@ -7,11 +7,11 @@
 
 #include "taskLoader.h"
 
-#include "../core/kmalloc.h"
 #include "../fs/fat32/fat32.h"
 #include "../scheduler/scheduler.h"
 #include "../mmu/mmu.h"
 
+#include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 
@@ -95,6 +95,7 @@ uint32_t getVirtualAddressOfSection( const char* sectionName, ELF_HEADER* elfHea
 uint32_t
 loadTaskFromFile( const char* fileName )
 {
+	int32_t ret = 0;
 	uint32_t i = 0;
 	uint32_t fileSize = 0;
 	uint8_t* fileBuffer = 0;
@@ -111,14 +112,14 @@ loadTaskFromFile( const char* fileName )
 
 	fat32Size( taskImageFile, &fileSize );
 
-	fileBuffer = ( uint8_t* ) kmalloc( fileSize );
+	fileBuffer = ( uint8_t* ) malloc( fileSize );
 	if ( 0 == fileBuffer )
 	{
 		return 1;
 	}
 
 	// read the elf-header to check for validity
-	int32_t ret = fat32Read( taskImageFile, sizeof( ELF_HEADER ), fileBuffer );
+	ret = fat32Read( taskImageFile, sizeof( ELF_HEADER ), fileBuffer );
 	if ( sizeof( ELF_HEADER ) != ret )
 	{
 		ret = 1;
@@ -163,6 +164,7 @@ loadTaskFromFile( const char* fileName )
 		ret = 1;
 		goto closeAndExit;
 	}
+
 
 	// need to know the stack-pointer to assign it to R13 in initialization
 	stackPointerAddress = getVirtualAddressOfSection( ".stack", elfHeader, fileBuffer );
@@ -228,6 +230,9 @@ loadTaskFromFile( const char* fileName )
 		}
 	}
 
+	mmu_ttbReset();
+	mmu_setProcessID( 0 );
+
 	ret = 0;
 
 closeAndExit:
@@ -235,7 +240,7 @@ closeAndExit:
 
 	if ( fileBuffer )
 	{
-		kfree( fileBuffer );
+		free( fileBuffer );
 	}
 
 	return ret;

@@ -290,7 +290,8 @@ uint32_t currentLine;
 uint32_t currentLineStart;
 uint8_t scalingFactor;
 
-uint8_t* framebuff;
+//uint8_t* framebuff;
+uint8_t framebuff[ 960 * 1024 * 3 ];
 long buffSize;
 
 void setScale(uint8_t scale) {
@@ -419,11 +420,13 @@ setWindowOffset(uint32_t offsetX, uint32_t offsetY) {
 	reg32w(DSPC_BASE, DSPC_GFX_POS, (window_offsetY << 16) | window_offsetX);
 }
 
+/*
 void
 attachFrameBuffer(uint8_t* fb) {
 	framebuff = fb;
 	reg32w(DSPC_BASE, DSPC_GFX_BA1, (uint32_t) framebuff);
 }
+*/
 
 void
 writeHDMI( const char* str ) {
@@ -454,8 +457,8 @@ openHDMI( void )
 	reg32w(DSPC_BASE, DSPC_TIMING_V, 0x01400504);
 
 	// NOTE: MALLOC DOESNT WORK FOR NOW - will run into a prefetch abort!
-	framebuff = malloc(buffSize);
-	memset(framebuff, 0, buffSize);
+	//framebuff = malloc(buffSize);
+	//memset(framebuff, 0, buffSize);
 
 	reg32w(DSPC_BASE, DSPC_GFX_BA1, (uint32_t) framebuff);
 	reg32w(DSPC_BASE, DSPC_GFX_SIZE, ((window_height -1) << 16) | ( window_width -1));

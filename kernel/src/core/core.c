@@ -86,7 +86,14 @@ swiHandler( uint32_t swiId, UserContext* ctx )
 	}
 	else if ( SYSC_CH_OPEN == swiId )
 	{
-		ctx->regs[ 0 ] = channel_open( ctx->regs[ 0 ] );
+		uint32_t ret = channel_open( ctx->regs[ 0 ] );
+		if ( 0 == ret )
+		{
+			// subscribe owner of the new channel to its channel, will always succeed
+			channel_subscribe( ctx->regs[ 0 ], getTask( getCurrentPid() ) );
+		}
+
+		ctx->regs[ 0 ] = ret;
 	}
 	else if ( SYSC_CH_CLOSE == swiId )
 	{

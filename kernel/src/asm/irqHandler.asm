@@ -25,9 +25,5 @@ _irq_handler_asm:
 	LDMFD	SP, { R0 - R14 }^			; restore user-registers, if changed by scheduler
 	ADD		SP, SP, #60					; increment stack-pointer: 15 * 4 bytes = 60bytes
 
-	; NOTE: at this point SP should be at starting address again
-
-	; TODO: when a process-switch was performed: MOVS	PC, LR should be enough, otherwise we must return to the instruction which was canceled by IRQ thus using SUBS
-
  	SUBS	PC, LR, #4					; return from IRQ
 

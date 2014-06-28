@@ -66,8 +66,11 @@ SWI -> IRQ
 #define USERMODE_WITHIRQ_CPSR		0x60000110
 #define SUPERVISORMODE_WITHIRQ_CPSR	0x60000113
 
+#define IDLE_TASK_MEM 				128
+
 // module-local data //////////////////////////////////////////////
 static uint8_t runningPID = 0;
+static uint8_t idleTaskStackMem[ IDLE_TASK_MEM ];
 // module-local functions /////////////////////////////////////////
 static Task* getNextReady();
 static void initializeTask( Task* task, uint32_t entryPointVAddress, uint32_t stackPointerVAddress );
@@ -80,8 +83,7 @@ uint32_t
 schedInit()
 {
 	// create idle-task first, it MUST BE at pid 0
-	// TODO: need a valid stackpointer for idle-function!
-	createTask( ( uint32_t ) idleTaskFunc, 0 );
+	createTask( ( uint32_t ) idleTaskFunc, ( ( uint32_t ) idleTaskStackMem ) + IDLE_TASK_MEM );
 
 	irqRegisterClbk( schedule, GPT2_IRQ );
 	irqTimerInit( SCHEDULE_INTERVAL_MS );
@@ -290,7 +292,7 @@ initializeTask( Task* task, uint32_t entryPointVAddress, uint32_t stackPointerVA
 int32_t
 idleTaskFunc( void )
 {
-	volatile uint32_t counter = 0;
+	uint32_t counter = 0;
 
 	while( 1 )
 	{

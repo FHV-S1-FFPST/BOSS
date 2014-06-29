@@ -8,14 +8,14 @@
 
 static MESSAGE msg;
 
-int
+void
 main( void )
 {
 	initSerial();
 
 	if ( channelOpen( SERIAL_CHANNEL ) )
 	{
-		return 1;
+		exitTask( 1 );
 	}
 
 	while ( 0 == receive( SERIAL_CHANNEL, &msg, 0 ) )
@@ -39,5 +39,5 @@ main( void )
 		}
 	}
 
-	return 0;
+	exitTask( 0 );
 }

@@ -92,6 +92,26 @@ schedInit()
 }
 
 void
+exitTask( uint32_t code )
+{
+	Task* task = getTask( getCurrentPid() );
+
+	// idle-task cannot be exited
+	if ( 0 == task->pid )
+	{
+		return;
+	}
+
+	// reset task and set to invalid state to mark it as not runnable
+	memset( task, 0, sizeof( Task ) );
+	task->state = INVALID;
+
+	// TODO: free memory in MMU
+
+	scheduleNextReady( currentUserCtx );
+}
+
+void
 schedStart()
 {
 	irqTimerStart();

@@ -89,7 +89,7 @@ static uint8_t eIdentMagicNumber[ 4 ] = { 0x7F, 'E', 'L', 'F' };
 ///////////////////////////////////////////////////////////////
 
 // module-local functions
-uint32_t getVirtualAddressOfSection( const char* sectionName, ELF_HEADER* elfHeader, uint8_t* dataBuffer );
+SECTION_HEADER* getSectionByName( const char* sectionName, ELF_HEADER* elfHeader, uint8_t* dataBuffer );
 ///////////////////////////////////////////////////////////////
 
 uint32_t
@@ -102,6 +102,7 @@ loadTaskFromFile( const char* fileName )
 	file_id taskImageFile = 0;
 	ELF_HEADER* elfHeader = 0;
 	uint32_t stackPointerAddress = 0;
+	SECTION_HEADER* stackSection = 0;
 
 	Task* task = 0;
 
@@ -166,13 +167,16 @@ loadTaskFromFile( const char* fileName )
 	}
 
 	// need to know the stack-pointer to assign it to R13 in initialization
-	stackPointerAddress = getVirtualAddressOfSection( ".stack", elfHeader, fileBuffer );
-	// no stackpointer found, invalid linkage
-	if ( 0 == stackPointerAddress )
+	stackSection = getSectionByName( ".stack", elfHeader, fileBuffer );
+	// no stack-section found, invalid linkage
+	if ( 0 == stackSection )
 	{
 		ret = 1;
 		goto closeAndExit;
 	}
+
+	// NOTE: need to increment stackPointerAddress by stack-size, because stack grows from top to bottom
+	stackPointerAddress = stackSection->sh_addr + stackSection->sh_size;
 
 	// create task in scheduler
 	task = createTask( elfHeader->e_entry, stackPointerAddress );
@@ -245,8 +249,8 @@ closeAndExit:
 	return ret;
 }
 
-uint32_t
-getVirtualAddressOfSection( const char* sectionName, ELF_HEADER* elfHeader, uint8_t* dataBuffer )
+SECTION_HEADER*
+getSectionByName( const char* sectionName, ELF_HEADER* elfHeader, uint8_t* dataBuffer )
 {
 	uint32_t i = 0;
 
@@ -262,7 +266,7 @@ getVirtualAddressOfSection( const char* sectionName, ELF_HEADER* elfHeader, uint
 			const char* currSectionName = &stringTable[ sectionHeader->sh_name ];
 			if ( 0 == strcasecmp( currSectionName, sectionName ) )
 			{
-				return sectionHeader->sh_addr;
+				return sectionHeader;
 			}
 		}
 	}

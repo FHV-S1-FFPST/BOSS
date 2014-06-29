@@ -6,14 +6,14 @@
 
 static MESSAGE msg;
 
-int
+void
 main( void )
 {
 	openHDMI();
 	
 	if ( channelOpen( HDMI_CHANNEL ) )
 	{
-		return 1;
+		exitTask( 1 );
 	}
 
 	writeHDMI( "Hello Johnny\n" );
@@ -26,5 +26,5 @@ main( void )
 		}
 	}
 
-	return 0;
+	exitTask( 0 );
 }

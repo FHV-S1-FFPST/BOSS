@@ -8,7 +8,7 @@ static MESSAGE msg;
 static uint32_t printText( const char* text );
 static uint32_t getCh( char* c );
 
-int
+void
 main( void )
 {
 	/*
@@ -18,12 +18,12 @@ main( void )
 	}
 	*/
 
-	// NOTE: need to wait 1000ms to ensure HDMI-channel was opened before by HDMI-driver
+	// NOTE: need to wait 10 seconds to ensure HDMI-channel was opened before by HDMI-driver
 	receive( NULL_CHANNEL, 0, 20000 );
 
 	if ( channelSubscribe( HDMI_CHANNEL ) )
 	{
-		return 1;
+		exitTask( 1 );
 	}
 
 	printText( "Hello Johnny!\n" );
@@ -41,7 +41,7 @@ main( void )
 		receive( NULL_CHANNEL, 0, 5000 );
 	}
 
-	return 1;
+	exitTask( 0 );
 }
 
 uint32_t

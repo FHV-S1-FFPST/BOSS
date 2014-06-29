@@ -34,11 +34,19 @@
 // REGISTER-ACCESS CALLS
 #define SYSC_READ_REG			14
 #define SYSC_WRITE_REG			15
-//#define SYSC_SLEEP			16
+
+// EXIT-CALL
+#define SYSC_EXIT_TASK			16
 
 // MISC CALLS
 #define SYSC_SYSMILLIS			17
 #define SYSC_PID				18
+
+// FILE-ACCESS CALLS
+#define SYSC_FOPEN				19
+#define SYSC_FCLOSE				20
+#define SYSC_FSIZE				21
+#define SYSC_FREAD				22
 ///////////////////////////////////////////////////////////////////////////////
 
 // defined SWI-aliases for the given sys-calls for user-apps //////////////////
@@ -55,15 +63,21 @@
 	// TASK-MANAGEMENT CALLS
 	#pragma SWI_ALIAS( readReg, SYSC_READ_REG );
 	#pragma SWI_ALIAS( writeReg, SYSC_WRITE_REG );
-	//#pragma SWI_ALIAS( sleep, SYSC_SLEEP );
+
+	// EXIT-CALL
+	#pragma SWI_ALIAS( exitTask, SYSC_EXIT_TASK );
 
 	// MISC CALLS
 	#pragma SWI_ALIAS( getSysMillis, SYSC_SYSMILLIS );
 	#pragma SWI_ALIAS( getPid, SYSC_PID );
+
+	// FILE-ACCESS CALLS
+	#pragma SWI_ALIAS( bossfopen, SYSC_FOPEN );
+	#pragma SWI_ALIAS( bossfclose, SYSC_FCLOSE );
+	#pragma SWI_ALIAS( bossfsize, SYSC_FSIZE );
+	#pragma SWI_ALIAS( bossfread, SYSC_FREAD );
 #endif
 ///////////////////////////////////////////////////////////////////////////////
-
-//typedef int32_t (*task_func) ( void* args );
 
 // SYSTEM-STRCUTURES
 
@@ -76,6 +90,8 @@ typedef struct
 	uint8_t data[ MESSAGE_MAX_DATA_SIZE ];
 	uint8_t dataSize;
 } MESSAGE;
+
+typedef int32_t file_id;
 
 // SYSTEM-CALLS ///////////////////////////////////////////////////////////////
 
@@ -134,6 +150,11 @@ uint32_t readReg( uint32_t address );
 uint32_t writeReg( uint32_t address, uint32_t value );
 
 /**
+ * Exits the task calling this function
+ */
+void exitTask( uint32_t code );
+
+/**
  * Returns the milliseconds since the system was started.
  */
 uint64_t getSysMillis();
@@ -142,6 +163,39 @@ uint64_t getSysMillis();
  * Returns the pid of the current process
  */
 int32_t getPid();
+
+/**
+ * Opens a file (for reading only) from the filePath.
+ * Returns 0 upon success, where file will contain a valid FILE pointer.
+ * Returns 1 upon failure, where file will not be changed.
+ */
+uint32_t bossfopen( const char* filePath, file_id* fileId );
+
+/**
+ * Closes a previously opened file.
+ * Returns 0 upon success.
+ * Returns 1 if not opened or invalid fileid.
+ */
+uint32_t bossfclose( file_id fileId );
+
+/**
+ * Reads up to nBytes into buffer from file.
+ * Returns the number of bytes actually read or -1 if failure or 0 if EOF has reached already during a previous read.
+ *
+ * HINT: read always less than 512 bytes as it is much faster.
+ * A test reading a 5MB MP3 file delivered:
+ * 133bytes: 8.3 sec
+ * 510bytes: 7.5 sec
+ * 512,1024,496 bytes: 13.9sec
+ */
+int32_t bossfread( file_id fileId, uint32_t nBytes, uint8_t* buffer );
+
+/**
+ * Stores the fileSize of the file with fileId in size.
+ * Returns 0 upon success.
+ * Returns 1 if not opened or invalid fileid.
+ */
+uint32_t bossfsize( file_id fileId, uint32_t* size );
 ///////////////////////////////////////////////////////////////////////////////
 
 #endif /* BOSS_H_ */

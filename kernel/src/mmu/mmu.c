@@ -298,7 +298,6 @@ void mmu_mapCoarseTableRegion(Region* reg, uint8_t pid) {
 		}
 
 		uint32_t indexInL1 = (regVAdressTemp >> 20) & 0x00000FFF;
-		Pagetable tempTable;
 		uint32_t tempL2Adress;
 
 		if((masterPT[indexInL1] & 0x00000003) == 0x2) {

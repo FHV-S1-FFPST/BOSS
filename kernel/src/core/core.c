@@ -15,6 +15,7 @@
 #include "../scheduler/scheduler.h"
 #include "../ipc/channel.h"
 #include "../task/taskTable.h"
+#include "../fs/fat32/fat32.h"
 
 // third includes: project-includes
 #include <boss.h>
@@ -51,7 +52,7 @@ SystemState
 querySystemState( void )
 {
 	uint32_t cpsr = _get_CPSR();
-	return BIT_CLEAR( cpsr, ~0x1F );
+	return ( SystemState ) BIT_CLEAR( cpsr, ~0x1F );
 }
 
 // NOTE: not marked with interrupt, applied different technique to handle SWI
@@ -111,6 +112,10 @@ swiHandler( uint32_t swiId, UserContext* ctx )
 	{
 		getPid();
 	}
+	else if ( SYSC_EXIT_TASK == swiId )
+	{
+		exitTask( ctx->regs[ 0 ] );
+	}
 	else if ( SYSC_READ_REG == swiId )
 	{
 		uint32_t value = READ_REGISTER( ctx->regs[ 0 ] );
@@ -120,13 +125,32 @@ swiHandler( uint32_t swiId, UserContext* ctx )
 	{
 		READ_REGISTER( ctx->regs[ 0 ] ) = ctx->regs[ 1 ];
 	}
+	else if ( SYSC_FOPEN == swiId )
+	{
+		file_id fileId;
+
+		ctx->regs[ 0 ] = fat32Open( ( const char* ) ctx->regs[ 0 ], &fileId );
+		ctx->regs[ 1 ] = fileId;
+	}
+	else if ( SYSC_FCLOSE == swiId )
+	{
+		ctx->regs[ 0 ] = fat32Close( ( file_id ) ctx->regs[ 0 ] );
+	}
+	else if ( SYSC_FSIZE == swiId )
+	{
+		ctx->regs[ 0 ] = fat32Size( ( file_id ) ctx->regs[ 0 ], ( uint32_t* ) &ctx->regs[ 1 ] );
+	}
+	else if ( SYSC_FREAD == swiId )
+	{
+		ctx->regs[ 0 ] = fat32Read( ( file_id ) ctx->regs[ 0 ], ctx->regs[ 1 ], ( uint8_t* ) ctx->regs[ 2 ] );
+	}
 }
 
 uint32_t
 dataAbortHandler( uint32_t faultStatusReg, uint32_t faultAddress )
 {
-	uint32_t faultStatus = faultStatusReg & 0xF;
-	uint32_t domain = ( faultStatusReg >> 4 ) & 0xF;
+	//uint32_t faultStatus = faultStatusReg & 0xF;
+	//uint32_t domain = ( faultStatusReg >> 4 ) & 0xF;
 
 	// TODO: ABORT-STACK seems to be not present in linkage, fix it
 

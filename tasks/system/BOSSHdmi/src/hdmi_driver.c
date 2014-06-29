@@ -291,7 +291,7 @@ uint32_t currentLineStart;
 uint8_t scalingFactor;
 
 //uint8_t* framebuff;
-uint8_t framebuff[ 960 * 1024 * 3 ];
+uint8_t framebuff[ 1920 * 1080 * 3 ];
 long buffSize;
 
 void setScale(uint8_t scale) {
@@ -436,8 +436,14 @@ writeHDMI( const char* str ) {
 uint32_t
 openHDMI( void )
 {
+	/*
 	screen_height = 960;
 	screen_width = 1024;
+	scalingFactor = 1;
+	*/
+
+	screen_height = 1080;
+	screen_width = 1920;
 	scalingFactor = 1;
 
 	window_height = screen_height;
@@ -456,9 +462,10 @@ openHDMI( void )
 	reg32w(DSPC_BASE, DSPC_TIMING_H, 0x0cf03f31);
 	reg32w(DSPC_BASE, DSPC_TIMING_V, 0x01400504);
 
-	// NOTE: MALLOC DOESNT WORK FOR NOW - will run into a prefetch abort!
+	// NOTE: will run into a prefetch abort, but not really clear why?
+	// stackpointer is set correctly, if malloc is called from main (no function call on stack) then it works
 	//framebuff = malloc(buffSize);
-	//memset(framebuff, 0, buffSize);
+	// memset(framebuff, 0, buffSize);
 
 	reg32w(DSPC_BASE, DSPC_GFX_BA1, (uint32_t) framebuff);
 	reg32w(DSPC_BASE, DSPC_GFX_SIZE, ((window_height -1) << 16) | ( window_width -1));

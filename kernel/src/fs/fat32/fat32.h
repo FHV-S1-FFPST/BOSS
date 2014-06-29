@@ -8,9 +8,9 @@
 #ifndef FAT32_H_
 #define FAT32_H_
 
-#include "../../common/common.h"
+#include <boss.h>
 
-typedef int32_t file_id;
+#include "../../common/common.h"
 
 /**
  * Initializes the FAT32.

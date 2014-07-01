@@ -12,7 +12,7 @@
 #include <inttypes.h>
 
 #define PAGE_COUNT 131072
-#define PAGE_START_ADDR 0x82500000
+#define PAGE_START_ADDR 0x84500000
 
 typedef struct {
 	uint32_t inUse;

@@ -19,6 +19,7 @@
 #define PERIPHERAL_REGION_VADDR		0x48000000
 #define PAGETABLE_REGION_PADDR		0x80000000
 #define SRAM_REGION_VADDR			0x40200000
+#define SHARED_REGION_VADDR			0x82500000
 
 #define PAGETABLE_SIZE				0x4000
 
@@ -155,6 +156,19 @@ Region _pageTableRegion =
 	.local = FALSE
 };
 
+Region _sharedRegion = {
+		.parentAddress = (uint32_t*) MASTER_PT_ADDR,
+		.pageSize = 1024,
+		.numPages = 32,
+		.vAddress = SHARED_REGION_VADDR,
+		.physicalStartAdress = SHARED_REGION_VADDR,
+		.AP = ReadWriteTwiceBitch,
+		.CB = WriteBack,
+		.ptType = MASTER,
+		.mappingType = Fixed,
+		.local = false
+};
+
 Region _sramRegion =
 {
 	.parentAddress = ( uint32_t* ) MASTER_PT_ADDR,
@@ -194,6 +208,7 @@ uint32_t mmu_init(void) {
 	mmu_mapRegion(&_peripheralRegion, 0);
 	mmu_mapRegion(&_pageTableRegion, 0);
 	mmu_mapRegion(&_sramRegion, 0);
+	mmu_mapRegion(&_sharedRegion, 0);
 
 	_ttb_set(MASTER_PT_ADDR);
 	_mmu_init();

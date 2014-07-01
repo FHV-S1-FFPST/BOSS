@@ -119,13 +119,9 @@ initDrivers( void )
 	}
 
 	loadTaskFromFile( "sys/hdmidrv.out" );
-	loadTaskFromFile( "sys/console.out" );
+	loadTaskFromFile( "usr/prod1.out" );
+	loadTaskFromFile( "usr/prod2.out" );
 
-	/*
-	loadTaskFromFile( "usr/bossnes.out" );
-	loadTaskFromFile( "sys/rs232drv.out" );
-	loadTaskFromFile( "usr/saf.out");
-	 */
 	return 0;
 }
 

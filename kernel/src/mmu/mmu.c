@@ -166,7 +166,7 @@ Region _sharedRegion = {
 		.CB = WriteBack,
 		.ptType = MASTER,
 		.mappingType = Fixed,
-		.local = false
+		.local = FALSE
 };
 
 Region _sramRegion =

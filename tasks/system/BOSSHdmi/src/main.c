@@ -14,6 +14,18 @@ main( void )
 	
 	writeHDMI( "Hello I'm the HDMI-Driver!\n" );
 
+	/*
+	srand ( getSysMillis() );
+	while ( 1 )
+	{
+		writeHDMI( "Hello ITM13!\n" );
+
+		int randTo = rand() % 4000;
+
+		receive( NULL_CHANNEL, 0, randTo + 1000 );
+	}
+*/
+
 	if ( channelOpen( HDMI_CHANNEL ) )
 	{
 		exitTask( 1 );

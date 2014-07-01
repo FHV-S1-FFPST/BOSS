@@ -4,13 +4,14 @@
 
 int main (void) {
 
+
   RETURN_CODE initReturn = initDrivers();
   if(initReturn == FAILURE) {
 	  return 1;
   }
 
   // Serial Test
-
+	/*
 
   //Set the baud-rate
   int baud_rate = 312;
@@ -28,12 +29,15 @@ int main (void) {
 	  }
 
   }
+*/
 
   // HDMI Test
 
-  //uint8_t scale = 5;
-  //driverIoctl(HDMI_DRIVER, SET_SCALE, &scale );
-  //driverWrite(HDMI_DRIVER, "Hallo!");
+  uint8_t scale = 5;
+  driverIoctl(HDMI_DRIVER, SET_SCALE, &scale );
+  driverWrite(HDMI_DRIVER, "Hallo 1!\n");
+  driverWrite(HDMI_DRIVER, "Hallo 2!\n");
+  driverWrite(HDMI_DRIVER, "Hallo 3!\n");
 
   while(1) {
 

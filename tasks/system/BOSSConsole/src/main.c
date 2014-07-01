@@ -11,14 +11,7 @@ static uint32_t getCh( char* c );
 void
 main( void )
 {
-	/*
-	if ( channelSubscribe( SERIAL_CHANNEL ) )
-	{
-		return 1;
-	}
-	*/
-
-	// NOTE: need to wait 10 seconds to ensure HDMI-channel was opened before by HDMI-driver
+	// NOTE: need to wait 20 seconds to ensure HDMI-channel was opened before by HDMI-driver
 	receive( NULL_CHANNEL, 0, 20000 );
 
 	if ( channelSubscribe( HDMI_CHANNEL ) )
@@ -26,19 +19,20 @@ main( void )
 		exitTask( 1 );
 	}
 
-	printText( "Hello Johnny!\n" );
-	printText( "You are again the latest!\n" );
+	srand ( getSysMillis() );
 
-	// char c[] = { '\0', '\0' };
+	printText( "Hello I'm the Console!\n" );
 
 	while ( 1 )
 	{
-		if ( printText( "Hello Vorarlberg!" ) )
+		if ( printText( "Hello ITM13!\n" ) )
 		{
 			break;
 		}
 
-		receive( NULL_CHANNEL, 0, 5000 );
+		int randTo = rand() % 4000;
+
+		receive( NULL_CHANNEL, 0, randTo + 1000 );
 	}
 
 	exitTask( 0 );
@@ -47,9 +41,10 @@ main( void )
 uint32_t
 printText( const char* text )
 {
-	msg.id = 0; // WRITE to hdmi
+	msg.id = 0;
 	msg.dataSize = strlen( text );
 	memcpy( msg.data, text, msg.dataSize );
+	msg.data[ msg.dataSize ] = '\0';
 
 	if ( send( HDMI_CHANNEL, &msg ) )
 	{

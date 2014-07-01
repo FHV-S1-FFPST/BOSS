@@ -20,6 +20,8 @@
 // third includes: project-includes
 #include <boss.h>
 
+#include <stdlib.h>
+
 #pragma INTERRUPT ( undefInstrHandler, UDEF );
 
 #define SYSTIMER_OVERFLOW_INTERVAL_MS 0xFFFFFF
@@ -67,7 +69,7 @@ swiHandler( uint32_t swiId, UserContext* ctx )
 
 		if ( SYSC_SEND == swiId )
 		{
-			ctx->regs[ 0 ] = channel_receivesMessage( ctx->regs[ 0 ], msg );
+			ctx->regs[ 0 ] = channel_receivesMessage( ctx->regs[ 0 ], msg, getTask( getCurrentPid() ) );
 		}
 		else if ( SYSC_RECEIVE == swiId )
 		{
@@ -75,7 +77,7 @@ swiHandler( uint32_t swiId, UserContext* ctx )
 		}
 		else if ( SYSC_SENDRCV == swiId )
 		{
-			if ( channel_receivesMessage( ctx->regs[ 0 ], msg ) )
+			if ( channel_receivesMessage( ctx->regs[ 0 ], msg, getTask( getCurrentPid() ) ) )
 			{
 				ctx->regs[ 0 ] = 1;
 			}
@@ -143,6 +145,15 @@ swiHandler( uint32_t swiId, UserContext* ctx )
 	else if ( SYSC_FREAD == swiId )
 	{
 		ctx->regs[ 0 ] = fat32Read( ( file_id ) ctx->regs[ 0 ], ctx->regs[ 1 ], ( uint8_t* ) ctx->regs[ 2 ] );
+	}
+	else if ( SYSC_ALLOCSHAREDMEM == swiId )
+	{
+		// NOTE: OS memory is shared by virtual memory, so this is a fake shared memory implementation
+		ctx->regs[ 0 ] = ( uint32_t ) malloc( ctx->regs[ 0 ] );
+	}
+	else if ( SYSC_FREESHAREDMEM == swiId )
+	{
+		free( ( void* ) ctx->regs[ 0 ] );
 	}
 }
 

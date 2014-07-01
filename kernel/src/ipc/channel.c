@@ -10,6 +10,7 @@
 
 #include "../common/common.h"
 #include "../scheduler/scheduler.h"
+#include "../mmu/mmu.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -46,11 +47,12 @@ typedef struct
 
 // module-local functions
 static IPC_CHANNEL* getChannelById( uint32_t channelId );
-static void copyMessageToTaskSpace( MESSAGE* msg );
+static void copyMessageToTaskSpace( MESSAGE* msg, Task* targetTask, Task* currentRunning );
 ////////////////////////////////////////////////////////
 
 // module-local data
 static IPC_CHANNEL _channels[ MAX_CHANNELS ];
+static MESSAGE cpyMsg;
 ////////////////////////////////////////////////////////
 
 uint32_t
@@ -102,7 +104,7 @@ channel_subscribe( uint32_t channelId, Task* task )
 }
 
 uint32_t
-channel_receivesMessage( uint32_t channelId, MESSAGE* msg )
+channel_receivesMessage( uint32_t channelId, MESSAGE* msg, Task* currentRunning )
 {
 	uint32_t i = 0;
 	bool consumed = FALSE;
@@ -126,7 +128,7 @@ channel_receivesMessage( uint32_t channelId, MESSAGE* msg )
 				subscriber->waitUntil = 0;
 				subscriber->state = READY;
 
-				copyMessageToTaskSpace( msg );
+				copyMessageToTaskSpace( msg, subscriber, currentRunning );
 				// receive will return 0 if message was received
 				subscriber->regs[ 0 ] = 0;
 
@@ -180,7 +182,9 @@ channel_waitForMessage( uint32_t channelId, Task* t, int32_t timeout )
 		{
 			MESSAGE* msg = &channel->msgQueue[ channel->msgQueueStartPos ];
 
-			copyMessageToTaskSpace( msg );
+			// receive has a pointer to the message to store as the 2nd parameter
+			MESSAGE* targetMsgPtr = ( MESSAGE* ) t->regs[ 1 ];
+			memcpy( targetMsgPtr, msg, sizeof( MESSAGE ) );
 
 			// clean-up message
 			channel->msgQueueStartPos = NEXT_MSG_QUEUE_STARTPOS( channel );
@@ -241,11 +245,19 @@ channel_waitForMessage( uint32_t channelId, Task* t, int32_t timeout )
 }
 
 void
-copyMessageToTaskSpace( MESSAGE* msg )
+copyMessageToTaskSpace( MESSAGE* msg, Task* targetTask, Task* currentRunning )
 {
+	cpyMsg = *msg;
+
+	mmu_ttbSet( ( int32_t ) targetTask->pageTable );
+	mmu_setProcessID( targetTask->pid );
+
 	// receive has a pointer to the message to store as the 2nd parameter
-	MESSAGE* targetMsgPtr = ( MESSAGE* ) currentUserCtx->regs[ 1 ];
-	memcpy( targetMsgPtr, msg, sizeof( MESSAGE ) );
+	MESSAGE* targetMsgPtr = ( MESSAGE* ) targetTask->regs[ 1 ];
+	memcpy( targetMsgPtr, &cpyMsg, sizeof( MESSAGE ) );
+
+	mmu_ttbSet( ( int32_t ) currentRunning->pageTable );
+	mmu_setProcessID( currentRunning->pid );
 }
 
 IPC_CHANNEL*

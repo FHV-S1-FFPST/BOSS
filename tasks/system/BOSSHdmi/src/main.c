@@ -10,13 +10,14 @@ void
 main( void )
 {
 	openHDMI();
+	setScale( 5 );
 	
+	writeHDMI( "Hello I'm the HDMI-Driver!\n" );
+
 	if ( channelOpen( HDMI_CHANNEL ) )
 	{
 		exitTask( 1 );
 	}
-
-	writeHDMI( "Hello Johnny\n" );
 
 	while ( 0 == receive( HDMI_CHANNEL, &msg, 0 ) )
 	{
@@ -25,6 +26,8 @@ main( void )
 			writeHDMI( ( const char* ) msg.data );
 		}
 	}
+
+	closeHDMI();
 
 	exitTask( 0 );
 }

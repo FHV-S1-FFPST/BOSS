@@ -52,6 +52,8 @@ typedef struct Offset2DData {
 #define DSPC_GFX_POS 0x088
 
 uint32_t openHDMI( void );
+uint32_t closeHDMI( void );
+
 void writeHDMI( const char* str );
 
 void setScale(uint8_t scale);

@@ -282,7 +282,7 @@ uint32_t currentLine;
 uint32_t currentLineStart;
 uint8_t scalingFactor;
 
-char* framebuff;
+char framebuff[ 1024 * 1024 * 3 ];
 long buffSize;
 
 static void setScale(uint8_t scale);
@@ -412,8 +412,8 @@ static void setWindowOffset(uint32_t offsetX, uint32_t offsetY) {
 }
 
 static void attachFrameBuffer(char * framebuffer) {
-	framebuff = framebuffer;
-	reg32w(DSPC_BASE, DSPC_GFX_BA1, (uint32_t) framebuff);
+	//framebuff = framebuffer;
+	reg32w(DSPC_BASE, DSPC_GFX_BA1, (uint32_t) framebuffer);
 }
 
 static RETURN_CODE writeHDMI(Driver_t *self, void *message) {
@@ -497,13 +497,10 @@ static RETURN_CODE openHDMI(Driver_t *self) {
 		reg32w(DSPC_BASE, DSPC_TIMING_H, 0x0cf03f31);
 		reg32w(DSPC_BASE, DSPC_TIMING_V, 0x01400504);
 
+		/*
 		framebuff = malloc(sizeof(char) * buffSize);
-		/*int i;
-		for(i = 0; i < buffSize; i++) {
-			framebuff[i] = (char) (rand() % 255);
-		} */
-
 		memset(framebuff, (char)0, buffSize);
+		*/
 
 		reg32w(DSPC_BASE, DSPC_GFX_BA1, (uint32_t) framebuff);
 		reg32w(DSPC_BASE, DSPC_GFX_SIZE, ((window_height -1) << 16) | ( window_width -1));

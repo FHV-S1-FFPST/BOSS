@@ -290,8 +290,7 @@ uint32_t currentLine;
 uint32_t currentLineStart;
 uint8_t scalingFactor;
 
-//uint8_t* framebuff;
-uint8_t framebuff[ 1920 * 1080 * 3 ];
+uint8_t* framebuff;
 long buffSize;
 
 void setScale(uint8_t scale) {
@@ -420,14 +419,6 @@ setWindowOffset(uint32_t offsetX, uint32_t offsetY) {
 	reg32w(DSPC_BASE, DSPC_GFX_POS, (window_offsetY << 16) | window_offsetX);
 }
 
-/*
-void
-attachFrameBuffer(uint8_t* fb) {
-	framebuff = fb;
-	reg32w(DSPC_BASE, DSPC_GFX_BA1, (uint32_t) framebuff);
-}
-*/
-
 void
 writeHDMI( const char* str ) {
 	drawStringWithColor( str, 0xFFFFFF);
@@ -436,14 +427,8 @@ writeHDMI( const char* str ) {
 uint32_t
 openHDMI( void )
 {
-	/*
 	screen_height = 960;
 	screen_width = 1024;
-	scalingFactor = 1;
-	*/
-
-	screen_height = 1080;
-	screen_width = 1920;
 	scalingFactor = 1;
 
 	window_height = screen_height;
@@ -462,16 +447,23 @@ openHDMI( void )
 	reg32w(DSPC_BASE, DSPC_TIMING_H, 0x0cf03f31);
 	reg32w(DSPC_BASE, DSPC_TIMING_V, 0x01400504);
 
-	// NOTE: will run into a prefetch abort, but not really clear why?
-	// stackpointer is set correctly, if malloc is called from main (no function call on stack) then it works
-	//framebuff = malloc(buffSize);
-	// memset(framebuff, 0, buffSize);
+	// NOTE: needs to be shared because hardware needs access to the memory mapped to OS
+	framebuff = allocSharedMem( buffSize );
+	memset(framebuff, 0, buffSize);
 
 	reg32w(DSPC_BASE, DSPC_GFX_BA1, (uint32_t) framebuff);
 	reg32w(DSPC_BASE, DSPC_GFX_SIZE, ((window_height -1) << 16) | ( window_width -1));
 	reg32w(DSPC_BASE, DSPC_GFX_POS, (window_offsetY << 16) | window_offsetX);
 	reg32w(DSPC_BASE, DSPC_GFX_ATTRIBUTES, (0x0 << 8) | (0x2 << 6) | (0x9 << 1) | 0x1);
 	reg32w(DSPC_BASE, DSPC_CONTROL, reg32r(DSPC_BASE, DSPC_CONTROL) | 0x01 << 5);
+
+	return 0;
+}
+
+uint32_t
+closeHDMI()
+{
+	freeSharedMem( framebuff );
 
 	return 0;
 }

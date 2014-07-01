@@ -47,6 +47,10 @@
 #define SYSC_FCLOSE				20
 #define SYSC_FSIZE				21
 #define SYSC_FREAD				22
+
+// SHARED-MEM CALLS
+#define SYSC_ALLOCSHAREDMEM		23
+#define SYSC_FREESHAREDMEM		24
 ///////////////////////////////////////////////////////////////////////////////
 
 // defined SWI-aliases for the given sys-calls for user-apps //////////////////
@@ -76,6 +80,10 @@
 	#pragma SWI_ALIAS( bossfclose, SYSC_FCLOSE );
 	#pragma SWI_ALIAS( bossfsize, SYSC_FSIZE );
 	#pragma SWI_ALIAS( bossfread, SYSC_FREAD );
+
+	// SHARED-MEM CALLS
+	#pragma SWI_ALIAS( allocSharedMem, SYSC_ALLOCSHAREDMEM );
+	#pragma SWI_ALIAS( freeSharedMem, SYSC_FREESHAREDMEM );
 #endif
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -196,6 +204,18 @@ int32_t bossfread( file_id fileId, uint32_t nBytes, uint8_t* buffer );
  * Returns 1 if not opened or invalid fileid.
  */
 uint32_t bossfsize( file_id fileId, uint32_t* size );
+
+/**
+ * allocates shared memory with given size
+ * returns 0 upon failure
+ * returns the address upon success
+ */
+void* allocSharedMem( uint32_t size );
+
+/**
+ * frees previously allocated shared memory
+ */
+void freeSharedMem( void* mem );
 ///////////////////////////////////////////////////////////////////////////////
 
 #endif /* BOSS_H_ */
